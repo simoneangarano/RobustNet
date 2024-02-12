@@ -4,8 +4,6 @@ Dataset setup and loaders
 from datasets import cityscapes
 from datasets import mapillary
 from datasets import synthia
-from datasets import kitti
-from datasets import camvid
 from datasets import bdd100k
 from datasets import gtav
 from datasets import nullloader
@@ -23,7 +21,8 @@ import torch
 
 num_classes = 19
 ignore_label = 255
-
+MAX_ITERS_TRAIN = 2975
+MAX_ITERS_VAL = 500
 
 def get_train_joint_transform(args, dataset):
     """
@@ -160,25 +159,26 @@ def create_extra_val_loader(args, dataset, val_input_transform, target_transform
                                         transform=val_input_transform,
                                         target_transform=target_transform,
                                         cv_split=args.cv,
-                                        image_in=args.image_in)
+                                        image_in=args.image_in, max_iters=MAX_ITERS_VAL)
+                                        
     elif dataset == 'bdd100k':
         val_set = bdd100k.BDD100K('val', 0,
                                   transform=val_input_transform,
                                   target_transform=target_transform,
                                   cv_split=args.cv,
-                                  image_in=args.image_in)
+                                  image_in=args.image_in, max_iters=MAX_ITERS_VAL)
     elif dataset == 'gtav':
         val_set = gtav.GTAV('val', 0,
                             transform=val_input_transform,
                             target_transform=target_transform,
                             cv_split=args.cv,
-                            image_in=args.image_in)
+                            image_in=args.image_in, max_iters=MAX_ITERS_VAL)
     elif dataset == 'synthia':
         val_set = synthia.Synthia('val', 0,
                                   transform=val_input_transform,
                                   target_transform=target_transform,
                                   cv_split=args.cv,
-                                  image_in=args.image_in)
+                                  image_in=args.image_in, max_iters=MAX_ITERS_VAL)
     elif dataset == 'mapillary':
         eval_size = 1536
         val_joint_transform_list = [
@@ -188,7 +188,7 @@ def create_extra_val_loader(args, dataset, val_input_transform, target_transform
                                       joint_transform_list=val_joint_transform_list,
                                       transform=val_input_transform,
                                       target_transform=target_transform,
-                                      test=False)
+                                      test=False, max_iters=MAX_ITERS_VAL)
     elif dataset == 'null_loader':
         val_set = nullloader.nullloader(args.crop_size)
     else:
@@ -304,7 +304,7 @@ def setup_loaders(args):
         train_input_transform, val_input_transform = get_input_transforms(args, dataset)
         target_transform, target_train_transform, target_aux_train_transform = get_target_transforms(args, dataset)
 
-        if args.class_uniform_pct:
+        if args.class_uniform_pct > 0:
             if args.coarse_boost_classes:
                 coarse_boost_classes = \
                     [int(c) for c in args.coarse_boost_classes.split(',')]
@@ -323,7 +323,7 @@ def setup_loaders(args):
                 class_uniform_tile=args.class_uniform_tile,
                 test=args.test_mode,
                 coarse_boost_classes=coarse_boost_classes,
-                image_in=args.image_in)
+                image_in=args.image_in, max_iters=MAX_ITERS_TRAIN)
         else:
             train_set = dataset.CityScapes(
                 city_quality, city_mode, 0,
@@ -332,13 +332,13 @@ def setup_loaders(args):
                 target_transform=target_train_transform,
                 target_aux_transform=target_aux_train_transform,
                 dump_images=args.dump_augmentation_images,
-                image_in=args.image_in)
+                image_in=args.image_in, max_iters=MAX_ITERS_TRAIN)
 
         val_set = dataset.CityScapes('fine', 'val', 0,
                                      transform=val_input_transform,
                                      target_transform=target_transform,
                                      cv_split=args.cv,
-                                     image_in=args.image_in)
+                                     image_in=args.image_in, max_iters=MAX_ITERS_VAL)
         train_sets.append(train_set)
         val_sets.append(val_set)
         val_dataset_names.append('cityscapes')
@@ -350,7 +350,7 @@ def setup_loaders(args):
         train_input_transform, val_input_transform = get_input_transforms(args, dataset)
         target_transform, target_train_transform, target_aux_train_transform = get_target_transforms(args, dataset)
 
-        if args.class_uniform_pct:
+        if args.class_uniform_pct > 0:
             if args.coarse_boost_classes:
                 coarse_boost_classes = \
                     [int(c) for c in args.coarse_boost_classes.split(',')]
@@ -369,7 +369,7 @@ def setup_loaders(args):
                 class_uniform_tile=args.class_uniform_tile,
                 test=args.test_mode,
                 coarse_boost_classes=coarse_boost_classes,
-                image_in=args.image_in)
+                image_in=args.image_in, max_iters=MAX_ITERS_TRAIN)
         else:
             train_set = dataset.BDD100K(
                 bdd_mode, 0,
@@ -379,13 +379,13 @@ def setup_loaders(args):
                 target_aux_transform=target_aux_train_transform,
                 dump_images=args.dump_augmentation_images,
                 cv_split=args.cv,
-                image_in=args.image_in)
+                image_in=args.image_in, max_iters=MAX_ITERS_TRAIN)
 
         val_set = dataset.BDD100K('val', 0,
                                   transform=val_input_transform,
                                   target_transform=target_transform,
                                   cv_split=args.cv,
-                                  image_in=args.image_in)
+                                  image_in=args.image_in, max_iters=MAX_ITERS_VAL)
         train_sets.append(train_set)
         val_sets.append(val_set)
         val_dataset_names.append('bdd100k')
@@ -397,7 +397,7 @@ def setup_loaders(args):
         train_input_transform, val_input_transform = get_input_transforms(args, dataset)
         target_transform, target_train_transform, target_aux_train_transform = get_target_transforms(args, dataset)
 
-        if args.class_uniform_pct:
+        if args.class_uniform_pct > 0:
             if args.coarse_boost_classes:
                 coarse_boost_classes = \
                     [int(c) for c in args.coarse_boost_classes.split(',')]
@@ -416,7 +416,7 @@ def setup_loaders(args):
                 class_uniform_tile=args.class_uniform_tile,
                 test=args.test_mode,
                 coarse_boost_classes=coarse_boost_classes,
-                image_in=args.image_in)
+                image_in=args.image_in, max_iters=MAX_ITERS_TRAIN)
         else:
             train_set = gtav.GTAV(
                 gtav_mode, 0,
@@ -426,13 +426,13 @@ def setup_loaders(args):
                 target_aux_transform=target_aux_train_transform,
                 dump_images=args.dump_augmentation_images,
                 cv_split=args.cv,
-                image_in=args.image_in)
+                image_in=args.image_in, max_iters=MAX_ITERS_TRAIN)
 
         val_set = gtav.GTAV('val', 0,
                             transform=val_input_transform,
                             target_transform=target_transform,
                             cv_split=args.cv,
-                            image_in=args.image_in)
+                            image_in=args.image_in, max_iters=MAX_ITERS_VAL)
         train_sets.append(train_set)
         val_sets.append(val_set)
         val_dataset_names.append('gtav')
@@ -444,7 +444,7 @@ def setup_loaders(args):
         train_input_transform, val_input_transform = get_input_transforms(args, dataset)
         target_transform, target_train_transform, target_aux_train_transform = get_target_transforms(args, dataset)
 
-        if args.class_uniform_pct:
+        if args.class_uniform_pct > 0:
             if args.coarse_boost_classes:
                 coarse_boost_classes = \
                     [int(c) for c in args.coarse_boost_classes.split(',')]
@@ -463,7 +463,7 @@ def setup_loaders(args):
                 class_uniform_tile=args.class_uniform_tile,
                 test=args.test_mode,
                 coarse_boost_classes=coarse_boost_classes,
-                image_in=args.image_in)
+                image_in=args.image_in, max_iters=MAX_ITERS_TRAIN)
         else:
             train_set = dataset.Synthia(
                 synthia_mode, 0,
@@ -473,13 +473,13 @@ def setup_loaders(args):
                 target_aux_transform=target_aux_train_transform,
                 dump_images=args.dump_augmentation_images,
                 cv_split=args.cv,
-                image_in=args.image_in)
+                image_in=args.image_in, max_iters=MAX_ITERS_TRAIN)
 
         val_set = dataset.Synthia('val', 0,
                                   transform=val_input_transform,
                                   target_transform=target_transform,
                                   cv_split=args.cv,
-                                  image_in=args.image_in)
+                                  image_in=args.image_in, max_iters=MAX_ITERS_VAL)
         train_sets.append(train_set)
         val_sets.append(val_set)
         val_dataset_names.append('synthia')
@@ -505,14 +505,14 @@ def setup_loaders(args):
             dump_images=args.dump_augmentation_images,
             class_uniform_pct=args.class_uniform_pct,
             class_uniform_tile=args.class_uniform_tile,
-            test=args.test_mode)
+            test=args.test_mode, max_iters=MAX_ITERS_TRAIN)
         val_set = dataset.Mapillary(
             'semantic', 'val',
             joint_transform_list=val_joint_transform_list,
             transform=val_input_transform,
             target_transform=target_transform,
             image_in=args.image_in,
-            test=False)
+            test=False, max_iters=MAX_ITERS_VAL)
         train_sets.append(train_set)
         val_sets.append(val_set)
         val_dataset_names.append('mapillary')
@@ -559,12 +559,12 @@ def setup_loaders(args):
                               num_workers=args.num_workers, shuffle=(train_sampler is None), drop_last=True, sampler = train_sampler)
 
     extra_val_loader = {}
-    for val_dataset in args.val_dataset:
-        extra_val_loader[val_dataset] = create_extra_val_loader(args, val_dataset, val_input_transform, target_transform, val_sampler)
+    # for val_dataset in args.val_dataset:
+    #     extra_val_loader[val_dataset] = create_extra_val_loader(args, val_dataset, val_input_transform, target_transform, val_sampler)
 
     covstat_val_loader = {}
-    for val_dataset in args.covstat_val_dataset:
-        covstat_val_loader[val_dataset] = create_covstat_val_loader(args, val_dataset, val_input_transform, target_transform, val_sampler)
+    # for val_dataset in args.covstat_val_dataset:
+    #     covstat_val_loader[val_dataset] = create_covstat_val_loader(args, val_dataset, val_input_transform, target_transform, val_sampler)
 
     return train_loader, val_loaders, train_set, extra_val_loader, covstat_val_loader
 

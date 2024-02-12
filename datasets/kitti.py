@@ -65,7 +65,7 @@ def get_train_val(cv_split, all_items):
             else:
                 train_set.append(all_items[i])
     else:
-        logging.info('Unknown cv_split {}'.format(cv_split))
+        print('Unknown cv_split {}'.format(cv_split))
         sys.exit()
 
     return train_set, val_set
@@ -90,7 +90,7 @@ def make_dataset(quality, mode, maxSkip=0, cv_split=0, hardnm=0):
     for it in c_items:
         item = (os.path.join(img_path, it), os.path.join(mask_path, it))
         all_items.append(item)
-    logging.info('KITTI has a total of {} images'.format(len(all_items)))
+    print('KITTI has a total of {} images'.format(len(all_items)))
 
     # split into train/val 
     train_set, val_set = get_train_val(cv_split, all_items)
@@ -102,10 +102,10 @@ def make_dataset(quality, mode, maxSkip=0, cv_split=0, hardnm=0):
     elif mode == 'trainval':
         items = train_set + val_set
     else:
-        logging.info('Unknown mode {}'.format(mode))
+        print('Unknown mode {}'.format(mode))
         sys.exit()
 
-    logging.info('KITTI-{}: {} images'.format(mode, len(items)))
+    print('KITTI-{}: {} images'.format(mode, len(items)))
 
     return items, aug_items
 
@@ -207,7 +207,7 @@ class KITTI(data.Dataset):
             img = img.resize((width, height), Image.BICUBIC)
             mask = mask.resize((width, height), Image.NEAREST)
         else:
-            logging.info('Unknown mode {}'.format(mode))
+            print('Unknown mode {}'.format(mode))
             sys.exit()
 
         mask = np.array(mask)

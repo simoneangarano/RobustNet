@@ -41,7 +41,7 @@ class DomainUniformConcatDataset(Dataset):
         self.offsets = self.cumsum(datasets)
         self.length = np.sum(self.lengths)
 
-        print("# domains: {}, Total length: {}, 1 epoch: {}, offsets: {}".format(
+        print("# Domains: {}, Total length: {}, Per epoch: {}, Offsets: {}".format(
             str(len(datasets)), str(self.length), str(len(self)), str(self.offsets)))
 
 

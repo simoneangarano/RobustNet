@@ -109,7 +109,7 @@ def class_centroids_image_from_color(item, tile_size, num_classes, id2trainid):
     #     for k, v in id2trainid.items():
     #         mask[mask_copy == k] = v
 
-    mask_copy = np.full(image_size, 255, dtype=np.uint8)
+    mask_copy = np.full(image_size, -1, dtype=np.uint8)
 
     if id2trainid:
         for k, v in id2trainid.items():
@@ -269,10 +269,10 @@ def build_epoch(imgs, centroids, num_classes, class_uniform_pct):
     num_classes:
     class_uniform_pct: class uniform sampling percent ( % of uniform images in one epoch )
     """
-    logging.info("Class Uniform Percentage: %s", str(class_uniform_pct))
+    print("Class Uniform Percentage: %s", str(class_uniform_pct))
     num_epoch = int(len(imgs))
 
-    logging.info('Class Uniform items per Epoch:%s', str(num_epoch))
+    print('Class Uniform items per Epoch:%s', str(num_epoch))
     num_per_class = int((num_epoch * class_uniform_pct) / num_classes)
     num_rand = num_epoch - num_per_class * num_classes
     # create random crops
@@ -281,7 +281,7 @@ def build_epoch(imgs, centroids, num_classes, class_uniform_pct):
     # now add uniform sampling
     for class_id in range(num_classes):
         string_format = "cls %d len %d"% (class_id, len(centroids[class_id]))
-        logging.info(string_format)
+        print(string_format)
     for class_id in range(num_classes):
         centroid_len = len(centroids[class_id])
         if centroid_len == 0:

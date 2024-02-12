@@ -48,7 +48,7 @@ cfg = __C
 __C.ITER = 0
 __C.EPOCH = 0
 
-__C.RANDOM_SEED = 304
+__C.RANDOM_SEED = 0
 # Use Class Uniform Sampling to give each class proper sampling
 __C.CLASS_UNIFORM_PCT = 0.0
 
@@ -68,22 +68,22 @@ __C.STRICTBORDERCLASS = None
 #Attribute Dictionary for Dataset
 __C.DATASET = AttrDict()
 #Cityscapes Dir Location
-__C.DATASET.CITYSCAPES_DIR = '/data/davian/segmentation/cityscapes'
+__C.DATASET.CITYSCAPES_DIR = '/home/simone/Datasets/Cityscapes'
 #SDC Augmented Cityscapes Dir Location
 __C.DATASET.CITYSCAPES_AUG_DIR = ''
 #Mapillary Dataset Dir Location
-__C.DATASET.MAPILLARY_DIR = '/data/davian/segmentation/mapillary'
+__C.DATASET.MAPILLARY_DIR = '/home/simone/Datasets/Mapillary'
 #GTAV, BDD100K Dataset Dir Location
-__C.DATASET.GTAV_DIR = '/data/davian/segmentation/gtav'
-__C.DATASET.BDD_DIR = '/data/davian/segmentation/bdd100k/bdd100k/seg'
+__C.DATASET.GTAV_DIR = '/home/simone/Datasets/GTAV'
+__C.DATASET.BDD_DIR = '/home/simone/Datasets/BDD100k'
 #Synthia Dataset Dir Location
-__C.DATASET.SYNTHIA_DIR = '/data/davian/segmentation/synthia'
+__C.DATASET.SYNTHIA_DIR = '/home/simone/Datasets/Synthia'
 #Kitti Dataset Dir Location
 __C.DATASET.KITTI_DIR = ''
 #SDC Augmented Kitti Dataset Dir Location
 __C.DATASET.KITTI_AUG_DIR = ''
 #Camvid Dataset Dir Location
-__C.DATASET.CAMVID_DIR = '/home/nas_datasets/segmentation/SegNet-Tutorial/CamVid'
+__C.DATASET.CAMVID_DIR = ''
 #Number of splits to support
 __C.DATASET.CV_SPLITS = 3
 
@@ -104,10 +104,10 @@ def assert_and_infer_cfg(args, make_immutable=True, train_mode=True):
     if hasattr(args, 'syncbn') and args.syncbn:
         __C.MODEL.BN = 'pytorch-syncnorm'
         __C.MODEL.BNFUNC = torch.nn.SyncBatchNorm
-        print('Using pytorch sync batch norm')
+        # print('Using pytorch sync batch norm')
     else:
         __C.MODEL.BNFUNC = torch.nn.BatchNorm2d
-        print('Using regular batch norm')
+        # print('Using regular batch norm')
 
     if not train_mode:
         cfg.immutable(True)

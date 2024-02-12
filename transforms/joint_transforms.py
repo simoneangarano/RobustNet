@@ -72,7 +72,7 @@ class RandomCrop(object):
     A random crop is taken such that the crop fits within the image.
     If a centroid is passed in, the crop must intersect the centroid.
     """
-    def __init__(self, size, ignore_index=0, nopad=True):
+    def __init__(self, size, ignore_index=255, nopad=True):
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
         else:
@@ -170,7 +170,7 @@ class CenterCrop(object):
 
 
 class CenterCropPad(object):
-    def __init__(self, size, ignore_index=0):
+    def __init__(self, size, ignore_index=255):
         if isinstance(size, numbers.Number):
             self.size = (int(size), int(size))
         else:
@@ -413,7 +413,7 @@ class RandomRotate(object):
 
 class RandomSizeAndCrop(object):
     def __init__(self, size, crop_nopad,
-                 scale_min=0.5, scale_max=2.0, ignore_index=0, pre_size=None):
+                 scale_min=0.5, scale_max=2.0, ignore_index=255, pre_size=None):
         self.size = size
         self.crop = RandomCrop(self.size, ignore_index=ignore_index, nopad=crop_nopad)
         self.scale_min = scale_min
@@ -550,7 +550,7 @@ class SlidingCrop(object):
 
 
 class ClassUniform(object):
-    def __init__(self, size, crop_nopad, scale_min=0.5, scale_max=2.0, ignore_index=0,
+    def __init__(self, size, crop_nopad, scale_min=0.5, scale_max=2.0, ignore_index=255,
                  class_list=[16, 15, 14]):
         """
         This is the initialization for class uniform sampling

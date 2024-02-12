@@ -104,7 +104,7 @@ if 'WORLD_SIZE' in os.environ:
     print("Total world size: ", int(os.environ['WORLD_SIZE']))
 
 torch.cuda.set_device(args.local_rank)
-print('My Rank:', args.local_rank)
+# print('My Rank:', args.local_rank)
 args.dist_url = args.dist_url + str(8000 + (int(time.time()%1000))//10)
 
 torch.distributed.init_process_group(backend='nccl',
@@ -430,7 +430,7 @@ def get_net():
     """
     Get Network for evaluation
     """
-    logging.info('Load model file: %s', args.snapshot)
+    print('Load model file: %s', args.snapshot)
     net = network.get_net(args, criterion=None)
     net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
     net = network.warp_network_in_dataparallel(net, args.local_rank)
@@ -520,7 +520,7 @@ class RunEval():
                 gt = gt[0].cpu().numpy()
                 # only write diff image if gt is valid
                 diff = (prediction != gt)
-                diff[gt == 255] = 0
+                diff[gt == -1] = 0
                 diffimg = Image.fromarray(diff.astype('uint8') * 255)
                 PIL.ImageChops.lighter(
                     blend,
@@ -583,12 +583,12 @@ def main():
     output_dir = os.path.join(args.ckpt_path, args.exp_name, args.split)
     os.makedirs(output_dir, exist_ok=True)
     save_log('eval', output_dir, date_str)
-    logging.info("Network Arch: %s", args.arch)
-    logging.info("CV split: %d", args.cv_split)
-    logging.info("Exp_name: %s", args.exp_name)
-    logging.info("Ckpt path: %s", args.ckpt_path)
-    logging.info("Scales : %s", ' '.join(str(e) for e in scales))
-    logging.info("Inference mode: %s", args.inference_mode)
+    print("Network Arch: %s", args.arch)
+    print("CV split: %d", args.cv_split)
+    print("Exp_name: %s", args.exp_name)
+    print("Ckpt path: %s", args.ckpt_path)
+    print("Scales : %s", ' '.join(str(e) for e in scales))
+    print("Inference mode: %s", args.inference_mode)
 
     # Set up network, loader, inference mode
     metrics = args.dataset != 'video_folder'
@@ -629,8 +629,8 @@ def main():
                 imgs, gt, img_names, mask_aux = data
 
         runner.inf(imgs, img_names, gt, inference, net, scales, pbar, base_img)
-        if iteration > 5 and args.test_mode:
-            break
+        # if iteration > 5 and args.test_mode:
+        #     break
 
     # Calculate final overall statistics
     runner.final_dump()

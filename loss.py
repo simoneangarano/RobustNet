@@ -34,7 +34,7 @@ def get_loss(args):
                                      ignore_index=datasets.ignore_label,
                                      upper_bound=args.wt_bound).cuda()
     else:
-        print("standard cross entropy")
+        # print("standard cross entropy")
         criterion = nn.CrossEntropyLoss(weight=ce_weight, reduction='mean',
                                        ignore_index=datasets.ignore_label).cuda()
 
@@ -81,7 +81,7 @@ def get_loss_aux(args):
     else:
         ce_weight = None
 
-    print("standard cross entropy")
+    # print("standard cross entropy")
     criterion = nn.CrossEntropyLoss(weight=ce_weight, reduction='mean',
                                     ignore_index=datasets.ignore_label).cuda()
 
@@ -125,7 +125,7 @@ class ImageBasedCrossEntropyLoss2d(nn.Module):
     def __init__(self, classes, weight=None, size_average=True, ignore_index=255,
                  norm=False, upper_bound=1.0):
         super(ImageBasedCrossEntropyLoss2d, self).__init__()
-        logging.info("Using Per Image based weighted loss")
+        # print("Using Per Image based weighted loss")
         self.num_classes = classes
         self.nll_loss = nn.NLLLoss(weight=weight, reduction='mean', ignore_index=ignore_index)
         self.norm = norm
@@ -171,7 +171,7 @@ class CrossEntropyLoss2d(nn.Module):
 
     def __init__(self, weight=None, size_average=True, ignore_index=255):
         super(CrossEntropyLoss2d, self).__init__()
-        logging.info("Using Cross Entropy Loss")
+        # print("Using Cross Entropy Loss")
         self.nll_loss = nn.NLLLoss(weight=weight, reduction='mean', ignore_index=ignore_index)
         self.logsoftmax = nn.LogSoftmax(dim=1)
         # self.weight = weight

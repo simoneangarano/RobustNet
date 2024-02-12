@@ -3,7 +3,7 @@ Synthia Dataset Loader
 """
 import logging
 import json
-import os
+import os, random
 import numpy as np
 from PIL import Image
 from skimage import color
@@ -199,12 +199,12 @@ def make_dataset(mode, maxSkip=0, cv_split=0):
     else:
         modes = [mode]
     for mode in modes:
-        logging.info('{} fine cities: '.format(mode))
+        # print('{} fine cities: '.format(mode))
         add_items(items, aug_items, img_path, mask_path,
                     mask_postfix, mode, maxSkip)
 
-    # logging.info('Cityscapes-{}: {} images'.format(mode, len(items)))
-    logging.info('Synthia-{}: {} images'.format(mode, len(items) + len(aug_items)))
+    # print('Cityscapes-{}: {} images'.format(mode, len(items)))
+    # print('Synthia-{}: {} images'.format(mode, len(items) + len(aug_items)))
     return items, aug_items
 
 
@@ -214,7 +214,7 @@ class Synthia(data.Dataset):
                  transform=None, target_transform=None, target_aux_transform=None, dump_images=False,
                  cv_split=None, eval_mode=False,
                  eval_scales=None, eval_flip=False, image_in=False,
-                 extract_feature=False):
+                 extract_feature=False, max_iters=None):
         self.mode = mode
         self.maxSkip = maxSkip
         self.joint_transform = joint_transform
@@ -240,9 +240,15 @@ class Synthia(data.Dataset):
                     cv_split, cfg.DATASET.CV_SPLITS)
         else:
             self.cv_split = 0
+
         self.imgs, _ = make_dataset(mode, self.maxSkip, cv_split=self.cv_split)
         if len(self.imgs) == 0:
             raise RuntimeError('Found 0 images, please check the data set')
+
+        if max_iters:
+            random.seed(0)
+            self.imgs = random.sample(self.imgs, max_iters)
+            print('Synthia-{}: {} images'.format(mode, len(self.imgs)))
 
         self.mean_std = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
@@ -384,7 +390,7 @@ class SynthiaUniform(data.Dataset):
             city = img_fn.split('_')[0]
             cities[city] = 1
         city_names = cities.keys()
-        logging.info('Cities for {} '.format(name) + str(sorted(city_names)))
+        print('Cities for {} '.format(name) + str(sorted(city_names)))
 
     def build_epoch(self, cut=False):
         """
@@ -435,16 +441,6 @@ class SynthiaUniform(data.Dataset):
                     else:
                         img, mask = xform(img, mask)
 
-        # Debug
-        if self.dump_images and centroid is not None:
-            outdir = '../../dump_imgs_{}'.format(self.mode)
-            os.makedirs(outdir, exist_ok=True)
-            dump_img_name = trainid_to_name[class_id] + '_' + img_name
-            out_img_fn = os.path.join(outdir, dump_img_name + '.png')
-            out_msk_fn = os.path.join(outdir, dump_img_name + '_mask.png')
-            mask_img = colorize_mask(np.array(mask))
-            img.save(out_img_fn)
-            mask_img.save(out_msk_fn)
 
         if self.transform is not None:
             img = self.transform(img)

@@ -3,7 +3,7 @@ Cityscapes Dataset Loader
 """
 import logging
 import json
-import os
+import os, random
 import numpy as np
 from PIL import Image, ImageCms
 from skimage import color
@@ -61,8 +61,8 @@ def add_items(items, aug_items, cities, img_path, mask_path, mask_postfix, mode,
             ###### dataset augmentation ############################
             ########################################################
             if mode == "train" and maxSkip > 0:
-                new_img_path = os.path.join(aug_root, 'leftImg8bit_trainvaltest', 'leftImg8bit')
-                new_mask_path = os.path.join(aug_root, 'gtFine_trainvaltest', 'gtFine')
+                new_img_path = os.path.join(aug_root, 'leftImg8bit')
+                new_mask_path = os.path.join(aug_root, 'gtFine')
                 file_info = it.split("_")
                 cur_seq_id = file_info[-1]
 
@@ -82,14 +82,14 @@ def add_items(items, aug_items, cities, img_path, mask_path, mask_postfix, mode,
     # items.extend(extra_items)
 
 
-def make_cv_splits(img_dir_name):
+def make_cv_splits(img_dir_name=None):
     """
     Create splits of train/val data.
     A split is a lists of cities.
     split0 is aligned with the default Cityscapes train/val.
     """
-    trn_path = os.path.join(root, img_dir_name, 'leftImg8bit', 'train')
-    val_path = os.path.join(root, img_dir_name, 'leftImg8bit', 'val')
+    trn_path = os.path.join(root, 'leftImg8bit', 'train')
+    val_path = os.path.join(root, 'leftImg8bit', 'val')
 
     trn_cities = ['train/' + c for c in os.listdir(trn_path)]
     val_cities = ['val/' + c for c in os.listdir(val_path)]
@@ -161,14 +161,14 @@ def make_dataset(quality, mode, maxSkip=0, fine_coarse_mult=6, cv_split=0):
         mask_path = os.path.join(root, 'gtCoarse', 'gtCoarse', 'train_extra')
         mask_postfix = '_gtCoarse_labelIds.png'
         coarse_dirs = make_split_coarse(img_path)
-        logging.info('{} coarse cities: '.format(mode) + str(coarse_dirs[mode]))
+        # print('{} coarse cities: '.format(mode) + str(coarse_dirs[mode]))
         add_items(items, aug_items, coarse_dirs[mode], img_path, mask_path,
                   mask_postfix, mode, maxSkip)
     elif quality == 'fine':
         assert mode in ['train', 'val', 'test', 'trainval']
-        img_dir_name = 'leftImg8bit_trainvaltest'
-        img_path = os.path.join(root, img_dir_name, 'leftImg8bit')
-        mask_path = os.path.join(root, 'gtFine_trainvaltest', 'gtFine')
+        img_dir_name = None
+        img_path = os.path.join(root, 'leftImg8bit')
+        mask_path = os.path.join(root, 'gtFine')
         mask_postfix = '_gtFine_labelIds.png'
         cv_splits = make_cv_splits(img_dir_name)
         if mode == 'trainval':
@@ -181,13 +181,13 @@ def make_dataset(quality, mode, maxSkip=0, fine_coarse_mult=6, cv_split=0):
                 add_items(items, aug_items, cv_splits, img_path, mask_path,
                           mask_postfix, mode, maxSkip)
             else:
-                logging.info('{} fine cities: '.format(mode) + str(cv_splits[cv_split][mode]))
+                # print('{} fine cities: '.format(mode) + str(cv_splits[cv_split][mode]))
                 add_items(items, aug_items, cv_splits[cv_split][mode], img_path, mask_path,
                           mask_postfix, mode, maxSkip)
     else:
         raise 'unknown cityscapes quality {}'.format(quality)
-    # logging.info('Cityscapes-{}: {} images'.format(mode, len(items)))
-    logging.info('Cityscapes-{}: {} images'.format(mode, len(items) + len(aug_items)))
+    # print('Cityscapes-{}: {} images'.format(mode, len(items)))
+    # print('Cityscapes-{}: {} images'.format(mode, len(items) + len(aug_items)))
     return items, aug_items
 
 
@@ -213,7 +213,7 @@ class CityScapes(data.Dataset):
     def __init__(self, quality, mode, maxSkip=0, joint_transform=None, sliding_crop=None,
                  transform=None, target_transform=None, target_aux_transform=None, dump_images=False,
                  cv_split=None, eval_mode=False,
-                 eval_scales=None, eval_flip=False, image_in=False, extract_feature=False):
+                 eval_scales=None, eval_flip=False, image_in=False, extract_feature=False, max_iters=None):
         self.quality = quality
         self.mode = mode
         self.maxSkip = maxSkip
@@ -242,7 +242,12 @@ class CityScapes(data.Dataset):
         self.imgs, _ = make_dataset(quality, mode, self.maxSkip, cv_split=self.cv_split)
         if len(self.imgs) == 0:
             raise RuntimeError('Found 0 images, please check the data set')
-
+        
+        if max_iters:
+            random.seed(0)
+            self.imgs = random.sample(self.imgs, max_iters)
+        print('Cityscapes-{}: {} images'.format(mode, len(self.imgs)))
+        
         self.mean_std = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
     def _eval_get_item(self, img, mask, scales, flip_bool):
@@ -429,7 +434,7 @@ class CityScapesUniform(data.Dataset):
             city = img_fn.split('_')[0]
             cities[city] = 1
         city_names = cities.keys()
-        logging.info('Cities for {} '.format(name) + str(sorted(city_names)))
+        print('Cities for {} '.format(name) + str(sorted(city_names)))
 
     def build_epoch(self, cut=False):
         """

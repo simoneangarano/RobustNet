@@ -506,9 +506,9 @@ def resnet18(pretrained=True, wt_layer=None, **kwargs):
         wt_layer = [0, 0, 0, 0, 0, 0, 0]
     model = ResNet(BasicBlock, [2, 2, 2, 2], wt_layer=wt_layer, **kwargs)
     if pretrained:
-        #model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
-        print("########### pretrained ##############")
-        mynn.forgiving_state_restore(model, model_zoo.load_url(model_urls['resnet18']))
+        model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+        # print("########### pretrained ##############")
+        # mynn.forgiving_state_restore(model, model_zoo.load_url(model_urls['resnet18']))
     return model
 
 
@@ -534,9 +534,9 @@ def resnet50(pretrained=True, wt_layer=None, **kwargs):
         wt_layer = [0, 0, 0, 0, 0, 0, 0]
     model = ResNet(Bottleneck, [3, 4, 6, 3], wt_layer=wt_layer, **kwargs)
     if pretrained:
-        #model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
-        print("########### pretrained ##############")
-        mynn.forgiving_state_restore(model, model_zoo.load_url(model_urls['resnet50']))
+        model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
+        # print("########### pretrained ##############")
+        # mynn.forgiving_state_restore(model, model_zoo.load_url(model_urls['resnet50']))
     return model
 
 
@@ -551,10 +551,10 @@ def resnet101(pretrained=True, wt_layer=None, **kwargs):
         wt_layer = [0, 0, 0, 0, 0, 0, 0]
     model = ResNet3X3(Bottleneck, [3, 4, 23, 3], wt_layer=wt_layer, **kwargs)
     if pretrained:
-        # model.load_state_dict(model_zoo.load_url(model_urls['resnet101']))
-        print("########### pretrained ##############")
+        model.load_state_dict(model_zoo.load_url(model_urls['resnet101']))
+        # print("########### pretrained ##############")
         # model.load_state_dict(torch.load('./pretrained/resnet101-imagenet.pth', map_location="cpu"))
-        mynn.forgiving_state_restore(model, torch.load('./pretrained/resnet101-imagenet.pth', map_location="cpu"))
+        # mynn.forgiving_state_restore(model, torch.load('./pretrained/resnet101-imagenet.pth', map_location="cpu"))
     return model
 
 
@@ -568,9 +568,9 @@ def resnet_adapt101(args, pretrained=True, **kwargs):
     """
     model = ResNet3X3(args, **kwargs)
     if pretrained:
-        # model.load_state_dict(model_zoo.load_url(model_urls['resnet101']))
-        print("########### pretrained ##############")
-        model.load_state_dict(torch.load('./pretrained/resnet_adapt101-imagenet.pth', map_location="cpu"))
+        model.load_state_dict(model_zoo.load_url(model_urls['resnet101']))
+        # print("########### pretrained ##############")
+        # model.load_state_dict(torch.load('./pretrained/resnet_adapt101-imagenet.pth', map_location="cpu"))
         # mynn.forgiving_state_restore(model, torch.load('./pretrained/resnet101-imagenet.pth', map_location="cpu"))
     return model
 

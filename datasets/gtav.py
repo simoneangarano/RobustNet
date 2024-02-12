@@ -3,7 +3,7 @@ GTAV Dataset Loader
 """
 import logging
 import json
-import os
+import os, random
 import numpy as np
 from PIL import Image
 from skimage import color
@@ -53,11 +53,11 @@ def add_items(items, aug_items, cities, img_path, mask_path, mask_postfix, mode,
     """
 
     for c in cities:
-        c_items = [name.split(img_postfix)[0] for name in
-                   os.listdir(os.path.join(img_path, c))]
-        for it in c_items:
-            item = (os.path.join(img_path, c, it + img_postfix),
-                    os.path.join(mask_path, c, it + mask_postfix))
+        # c_items = [name.split(img_postfix)[0] for name in
+        #            os.path.join(img_path, c)]
+        # for it in c_items:
+        #     item = (os.path.join(img_path, c, it + img_postfix),
+        #             os.path.join(mask_path, c, it + mask_postfix))
             # ########################################################
             # ###### dataset augmentation ############################
             # ########################################################
@@ -79,6 +79,8 @@ def add_items(items, aug_items, cities, img_path, mask_path, mask_postfix, mode,
             #                  os.path.join(new_mask_path, c, next_it + mask_postfix))
             #     if os.path.isfile(next_item[0]) and os.path.isfile(next_item[1]):
             #         aug_items.append(next_item)
+            item = (os.path.join(img_path, c),
+                    os.path.join(mask_path, c))
             items.append(item)
     # items.extend(extra_items)
 
@@ -90,10 +92,10 @@ def make_cv_splits(img_dir_name):
     split0 is aligned with the default Cityscapes train/valid.
     """
     trn_path = os.path.join(root, img_dir_name, 'train')
-    val_path = os.path.join(root, img_dir_name, 'valid')
+    val_path = os.path.join(root, img_dir_name, 'val')
 
     trn_cities = ['train/' + c for c in os.listdir(trn_path)]
-    val_cities = ['valid/' + c for c in os.listdir(val_path)]
+    val_cities = ['val/' + c for c in os.listdir(val_path)]
 
     # want reproducible randomly shuffled
     trn_cities = sorted(trn_cities)
@@ -165,12 +167,12 @@ def make_dataset(mode, maxSkip=0, cv_split=0):
     else:
         modes = [mode]
     for mode in modes:
-        logging.info('{} fine cities: '.format(mode) + str(cv_splits[cv_split][mode]))
+        # print('{} fine cities: '.format(mode) + str(cv_splits[cv_split][mode]))
         add_items(items, aug_items, cv_splits[cv_split][mode], img_path, mask_path,
                     mask_postfix, mode, maxSkip)
 
-    # logging.info('Cityscapes-{}: {} images'.format(mode, len(items)))
-    logging.info('GTAV-{}: {} images'.format(mode, len(items) + len(aug_items)))
+    # print('Cityscapes-{}: {} images'.format(mode, len(items)))
+    # print('GTAV-{}: {} images'.format(mode, len(items) + len(aug_items)))
     return items, aug_items
 
 
@@ -180,7 +182,7 @@ class GTAV(data.Dataset):
                  transform=None, target_transform=None, target_aux_transform=None, dump_images=False,
                  cv_split=None, eval_mode=False,
                  eval_scales=None, eval_flip=False, image_in=False,
-                 extract_feature=False):
+                 extract_feature=False, max_iters=None):
         self.mode = mode
         self.maxSkip = maxSkip
         self.joint_transform = joint_transform
@@ -209,6 +211,11 @@ class GTAV(data.Dataset):
         self.imgs, _ = make_dataset(mode, self.maxSkip, cv_split=self.cv_split)
         if len(self.imgs) == 0:
             raise RuntimeError('Found 0 images, please check the data set')
+        
+        if max_iters:
+            random.seed(0)
+            self.imgs = random.sample(self.imgs, max_iters)
+        print('GTAV-{}: {} images'.format(mode, len(self.imgs)))
 
         self.mean_std = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
@@ -231,10 +238,10 @@ class GTAV(data.Dataset):
     def __getitem__(self, index):
 
         img_path, mask_path = self.imgs[index]
-        img, mask = Image.open(img_path).convert('RGB'), m.imread(mask_path)
+        img, mask = Image.open(img_path).convert('RGB'), np.array(Image.open(mask_path))
         img_name = os.path.splitext(os.path.basename(img_path))[0]
 
-        while (img.size[1], img.size[0]) != mask[:,:,0].shape:
+        while (img.size[1], img.size[0]) != mask.shape:
             print("Error!!", img.size, mask[:,:,0].shape, img_name)
             print("Dropping ", str(index))
             # index = index + 1
@@ -246,12 +253,12 @@ class GTAV(data.Dataset):
             img, mask = Image.open(img_path).convert('RGB'), m.imread(mask_path)
             img_name = os.path.splitext(os.path.basename(img_path))[0]
 
-        image_size = mask[:,:,0].shape
+        image_size = mask.shape
         mask_copy = np.full(image_size, ignore_label, dtype=np.uint8)
 
         for k, v in color_to_trainid.items():
             if v != 255 and v != -1:
-                mask_copy[(mask == np.array(k))[:,:,0] & (mask == np.array(k))[:,:,1] & (mask == np.array(k))[:,:,2]] = v
+                mask_copy[(mask == np.array(k))] = v
 
         # for k, v in color_to_trainid.items():
         #     mask_copy[(mask == np.array(k))[:,:,0]] = v
@@ -372,7 +379,7 @@ class GTAVUniform(data.Dataset):
             city = img_fn.split('_')[0]
             cities[city] = 1
         city_names = cities.keys()
-        logging.info('Cities for {} '.format(name) + str(sorted(city_names)))
+        print('Cities for {} '.format(name) + str(sorted(city_names)))
 
     def build_epoch(self, cut=False):
         """

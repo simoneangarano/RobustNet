@@ -3,7 +3,7 @@ BDD100K Dataset Loader
 """
 import logging
 import json
-import os
+import os, random
 import numpy as np
 from PIL import Image
 from skimage import color
@@ -160,22 +160,21 @@ def make_dataset(mode, maxSkip=0, cv_split=0):
     aug_items = []
 
     assert mode in ['train', 'val', 'test', 'trainval']
-    img_dir_name = 'images'
+    img_dir_name = 'images/10k'
     img_path = os.path.join(root, img_dir_name)
-    mask_path = os.path.join(root, 'labels')
-    mask_postfix = '_train_id.png'
+    mask_path = os.path.join(root, 'labels/sem_seg/masks')
+    mask_postfix = '.png'
     # cv_splits = make_cv_splits(img_dir_name)
     if mode == 'trainval':
         modes = ['train', 'val']
     else:
         modes = [mode]
     for mode in modes:
-        logging.info('{} fine cities: '.format(mode))
+        # print('{} fine cities: '.format(mode))
         add_items(items, aug_items, img_path, mask_path,
                     mask_postfix, mode, maxSkip)
 
-    # logging.info('Cityscapes-{}: {} images'.format(mode, len(items)))
-    logging.info('BDD100K-{}: {} images'.format(mode, len(items) + len(aug_items)))
+    # print('Cityscapes-{}: {} images'.format(mode, len(items)))
     return items, aug_items
 
 
@@ -185,7 +184,7 @@ class BDD100K(data.Dataset):
                  transform=None, target_transform=None, target_aux_transform=None, dump_images=False,
                  cv_split=None, eval_mode=False,
                  eval_scales=None, eval_flip=False, image_in=False,
-                 extract_feature=False):
+                 extract_feature=False, max_iters=None):
         self.mode = mode
         self.maxSkip = maxSkip
         self.joint_transform = joint_transform
@@ -214,6 +213,11 @@ class BDD100K(data.Dataset):
         self.imgs, _ = make_dataset(mode, self.maxSkip, cv_split=self.cv_split)
         if len(self.imgs) == 0:
             raise RuntimeError('Found 0 images, please check the data set')
+        
+        if max_iters:
+            random.seed(0)
+            self.imgs = random.sample(self.imgs, max_iters)
+        print('BDD100K-{}: {} images'.format(mode, len(self.imgs)))
 
         self.mean_std = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
@@ -356,7 +360,7 @@ class BDD100KUniform(data.Dataset):
             city = img_fn.split('_')[0]
             cities[city] = 1
         city_names = cities.keys()
-        logging.info('Cities for {} '.format(name) + str(sorted(city_names)))
+        print('Cities for {} '.format(name) + str(sorted(city_names)))
 
     def build_epoch(self, cut=False):
         """

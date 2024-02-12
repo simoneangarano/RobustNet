@@ -124,7 +124,7 @@ def make_dataset(quality, mode, maxSkip=0, cv_split=0, hardnm=0):
     aug_mask_path = os.path.join(root, augmented_img_dir, 'trainannot')
 
     train_items, train_aug_items = add_items(img_path, mask_path, aug_img_path, aug_mask_path, mode, maxSkip)
-    logging.info('Camvid has a total of {} train images'.format(len(train_items)))
+    print('Camvid has a total of {} train images'.format(len(train_items)))
 
     img_path = os.path.join(root, original_img_dir, 'val')
     mask_path = os.path.join(root, original_img_dir, 'valannot')
@@ -132,13 +132,13 @@ def make_dataset(quality, mode, maxSkip=0, cv_split=0, hardnm=0):
     aug_mask_path = os.path.join(root, augmented_img_dir, 'valannot')
 
     val_items, val_aug_items = add_items(img_path, mask_path, aug_img_path, aug_mask_path, mode, maxSkip)
-    logging.info('Camvid has a total of {} validation images'.format(len(val_items)))
+    print('Camvid has a total of {} validation images'.format(len(val_items)))
 
     if mode == 'test':
         img_path = os.path.join(root, original_img_dir, 'test')
         mask_path = os.path.join(root, original_img_dir, 'testannot')
         test_items, test_aug_items = add_items(img_path, mask_path, aug_img_path, aug_mask_path, mode, maxSkip)
-        logging.info('Camvid has a total of {} test images'.format(len(test_items)))
+        print('Camvid has a total of {} test images'.format(len(test_items)))
 
     if mode == 'train':
         items = train_items
@@ -151,10 +151,10 @@ def make_dataset(quality, mode, maxSkip=0, cv_split=0, hardnm=0):
         items = test_items
         aug_items = []
     else:
-        logging.info('Unknown mode {}'.format(mode))
+        print('Unknown mode {}'.format(mode))
         sys.exit()
 
-    logging.info('Camvid-{}: {} images'.format(mode, len(items)))
+    print('Camvid-{}: {} images'.format(mode, len(items)))
 
     return items, aug_items
 

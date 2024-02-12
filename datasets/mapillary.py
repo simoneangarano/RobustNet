@@ -3,7 +3,7 @@ Mapillary Dataset Loader
 """
 import logging
 import json
-import os
+import os, random
 import numpy as np
 from PIL import Image, ImageCms
 from skimage import color
@@ -22,7 +22,7 @@ from config import cfg
 num_classes = 19 #65
 ignore_label = 255 #65
 root = cfg.DATASET.MAPILLARY_DIR
-config_fn = os.path.join(root, 'config.json')
+config_fn = os.path.join(root, 'config_v1.2.json')
 color_mapping = []
 id_to_trainid = {}
 id_to_ignore_or_group = {}
@@ -140,15 +140,14 @@ def make_dataset(quality, mode):
     img_dir_name = None
     if quality == 'semantic':
         if mode == 'train':
-            img_dir_name = 'training'
+            img_dir_name = 'training/v1.2'
         if mode == 'val':
-            img_dir_name = 'validation'
+            img_dir_name = 'validation/v1.2'
         mask_path = os.path.join(root, img_dir_name, 'labels')
     else:
         raise BaseException("Instance Segmentation Not support")
 
-    img_path = os.path.join(root, img_dir_name, 'images')
-    print(img_path)
+    img_path = os.path.join(root, img_dir_name, 'instances')
     if quality != 'video':
         imgs = sorted([os.path.splitext(f)[0] for f in os.listdir(img_path)])
         msks = sorted([os.path.splitext(f)[0] for f in os.listdir(mask_path)])
@@ -194,7 +193,7 @@ class Mapillary(data.Dataset):
     def __init__(self, quality, mode, joint_transform_list=None,
                  transform=None, target_transform=None, target_aux_transform=None,
                  image_in=False, dump_images=False, class_uniform_pct=0,
-                 class_uniform_tile=768, test=False):
+                 class_uniform_tile=768, test=False, max_iters=None):
         """
         class_uniform_pct = Percent of class uniform samples. 1.0 means fully uniform.
                             0.0 means fully random.
@@ -219,11 +218,18 @@ class Mapillary(data.Dataset):
         self.imgs = make_dataset(quality, mode)
         if len(self.imgs) == 0:
             raise RuntimeError('Found 0 images, please check the data set')
-        if test:
-            np.random.shuffle(self.imgs)
-            self.imgs = self.imgs[:200]
+        
+        if max_iters:
+            random.seed(0)
+            self.imgs = random.sample(self.imgs, max_iters)
 
-        if self.class_uniform_pct:
+        print('Mapillary-{}: {} images'.format(mode, len(self.imgs)))
+        
+        # if test:
+        #     np.random.shuffle(self.imgs)
+        #     self.imgs = self.imgs[:200]
+
+        if self.class_uniform_pct > 0:
             json_fn = 'mapillary_tile{}.json'.format(self.class_uniform_tile)
             if os.path.isfile(json_fn):
                 with open(json_fn, 'r') as json_data:
@@ -243,7 +249,7 @@ class Mapillary(data.Dataset):
         self.build_epoch()
 
     def build_epoch(self):
-        if self.class_uniform_pct != 0:
+        if self.class_uniform_pct > 0:
             self.imgs_uniform = uniform.build_epoch(self.imgs,
                                                     self.centroids,
                                                     num_classes,

@@ -16,8 +16,6 @@ import network
 import optimizer
 import time
 import torchvision.utils as vutils
-import torch.nn.functional as F
-from network.mynn import freeze_weights, unfreeze_weights
 import numpy as np
 import random
 
@@ -33,7 +31,7 @@ parser.add_argument('--image_uniform_sampling', action='store_true', default=Fal
                     help='uniformly sample images across the multiple source domains')
 parser.add_argument('--val_dataset', nargs='*', type=str, default=['bdd100k'],
                     help='a list consists of cityscapes, mapillary, gtav, bdd100k, synthia')
-parser.add_argument('--covstat_val_dataset', nargs='*', type=str, default=['cityscapes'],
+parser.add_argument('--covstat_val_dataset', nargs='*', type=str, default=[],
                     help='a list consists of cityscapes, mapillary, gtav, bdd100k, synthia')
 parser.add_argument('--cv', type=int, default=0,
                     help='cross-validation split id to use. Default # of splits set to 3 in config')
@@ -160,6 +158,9 @@ parser.add_argument('--use_wtloss', action='store_true', default=False,
 parser.add_argument('--use_isw', action='store_true', default=False,
                     help='Automatic setting from wt_layer')
 
+parser.add_argument('--kd', action='store_true', default=False)
+parser.add_argument('--weights_dir', type=str, default='./bin/')
+
 args = parser.parse_args()
 
 # Enable CUDNN Benchmarking optimization
@@ -177,7 +178,8 @@ args.world_size = 1
 
 # Test Mode run two epochs with a few iterations of training and val
 if args.test_mode:
-    args.max_epoch = 2
+    args.max_epoch = 1
+    args.max_iter = 100
 
 if 'WORLD_SIZE' in os.environ:
     # args.apex = int(os.environ['WORLD_SIZE']) > 1
@@ -185,7 +187,7 @@ if 'WORLD_SIZE' in os.environ:
     print("Total world size: ", int(os.environ['WORLD_SIZE']))
 
 torch.cuda.set_device(args.local_rank)
-print('My Rank:', args.local_rank)
+# print('My Rank:', args.local_rank)
 # Initialize distributed communication
 args.dist_url = args.dist_url + str(8000 + (int(time.time()%1000))//10)
 
@@ -210,15 +212,26 @@ def main():
     writer = prep_experiment(args, parser)
 
     train_loader, val_loaders, train_obj, extra_val_loaders, covstat_val_loaders = datasets.setup_loaders(args)
-
+     
+    # Student
     criterion, criterion_val = loss.get_loss(args)
     criterion_aux = loss.get_loss_aux(args)
     net = network.get_net(args, criterion, criterion_aux)
-
     optim, scheduler = optimizer.get_optimizer(args, net)
-
     net = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
-    net = network.warp_network_in_dataparallel(net, args.local_rank)
+    # net = network.warp_network_in_dataparallel(net, args.local_rank)
+
+    # Teachers
+    teacher = None
+    if args.kd:
+        teachers = []
+        for args.val_dataset in args.val_dataset:
+            teacher = network.get_net(args, criterion, criterion_aux)
+            teacher = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
+            teacher.load_state_dict(torch.load(os.path.join(args.weights_dir, args.val_dataset + '.pth'))['state_dict'])
+            teachers.append(teacher)
+        teacher = network.make_ensemble_net(teachers)   
+
     epoch = 0
     i = 0
 
@@ -231,7 +244,7 @@ def main():
         else:
             epoch = 0
 
-    print("#### iteration", i)
+    print("\n### Epoch", i)
     torch.cuda.empty_cache()
     # Main Loop
     # for epoch in range(args.start_epoch, args.max_epoch):
@@ -242,7 +255,7 @@ def main():
         cfg.ITER = i
         cfg.immutable(True)
 
-        i = train(train_loader, net, optim, epoch, writer, scheduler, args.max_iter)
+        i = train(train_loader, net, optim, epoch, writer, scheduler, args.max_iter, teacher)
         train_loader.sampler.set_epoch(epoch + 1)
 
         if (args.dynamic and args.use_isw and epoch % (args.cov_stat_epoch + 1) == args.cov_stat_epoch) \
@@ -255,9 +268,10 @@ def main():
                     net.module.set_mask_matrix()
 
         if args.local_rank == 0:
-            print("Saving pth file...")
-            evaluate_eval(args, net, optim, scheduler, None, None, [],
-                        writer, epoch, "None", None, i, save_pth=True)
+            print("\nEvaluating...")
+            for dataset, val_loader in val_loaders.items():
+                validate(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i)
+            # evaluate_eval(args, net, optim, scheduler, None, None, [], writer, epoch, "None", None, i, save_pth=True)
 
         if args.class_uniform_pct:
             if epoch >= args.max_cu_epoch:
@@ -275,7 +289,7 @@ def main():
             validate(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i)
     else:
         if args.local_rank == 0:
-            print("Saving pth file...")
+            print("Final Evaluation...")
             evaluate_eval(args, net, optim, scheduler, None, None, [],
                         writer, epoch, "None", None, i, save_pth=True)
 
@@ -284,7 +298,7 @@ def main():
         validate(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i, save_pth=False)
 
 
-def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter):
+def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter, teacher=None):
     """
     Runs the training loop per epoch
     train_loader: Data loader for train
@@ -295,6 +309,8 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter):
     return:
     """
     net.train()
+    if teacher is not None:
+        teacher.eval()
 
     train_total_loss = AverageMeter()
     time_meter = AverageMeter()
@@ -336,11 +352,16 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter):
             input, gt = input.cuda(), gt.cuda()
 
             optim.zero_grad()
+            t_output = None
+            if teacher is not None:
+                with torch.no_grad():
+                    t_output = teacher(input)
+
             if args.use_isw:
                 outputs = net(input, gts=gt, aux_gts=aux_gt, img_gt=img_gt, visualize=args.visualize_feature,
                             apply_wtloss=False if curr_epoch<=args.cov_stat_epoch else True)
             else:
-                outputs = net(input, gts=gt, aux_gts=aux_gt, img_gt=img_gt, visualize=args.visualize_feature)
+                outputs = net(input, gts=gt, aux_gts=aux_gt, img_gt=img_gt, visualize=args.visualize_feature, t_out=t_output)
             outputs_index = 0
             main_loss = outputs[outputs_index]
             outputs_index += 1
@@ -352,6 +373,10 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter):
                 wt_loss = outputs[outputs_index]
                 outputs_index += 1
                 total_loss = total_loss + (args.wt_reg_weight * wt_loss)
+            if args.kd:
+                kd_loss = outputs[outputs_index]
+                total_loss = total_loss + kd_loss
+                outputs_index += 1
             else:
                 wt_loss = 0
 
@@ -372,15 +397,15 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter):
             del total_loss, log_total_loss
 
             if args.local_rank == 0:
-                if i % 50 == 49:
+                if i % 100 == 99:
                     if args.visualize_feature:
                         visualize_matrix(writer, f_cor_arr, curr_iter, '/Covariance/Feature-')
 
-                    msg = '[epoch {}], [iter {} / {} : {}], [loss {:0.6f}], [lr {:0.6f}], [time {:0.4f}]'.format(
-                        curr_epoch, i + 1, len(train_loader), curr_iter, train_total_loss.avg,
+                    msg = '[{}][{}/{}] \t loss {:0.6f} \t lr {:.1e} \t time {:0.2f}'.format(
+                        curr_epoch, curr_iter, max_iter, train_total_loss.avg,
                         optim.param_groups[-1]['lr'], time_meter.avg / args.train_batch_size)
 
-                    logging.info(msg)
+                    print(msg)
                     if args.use_wtloss:
                         print("Whitening Loss", wt_loss)
 
@@ -393,8 +418,8 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter):
         curr_iter += 1
         scheduler.step()
 
-        if i > 5 and args.test_mode:
-            return curr_iter
+        # if i > 5 and args.test_mode:
+        #     return curr_iter
 
     return curr_iter
 
@@ -454,11 +479,11 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
         predictions = output.data.max(1)[1].cpu()
 
         # Logging
-        if val_idx % 20 == 0:
-            if args.local_rank == 0:
-                logging.info("validating: %d / %d", val_idx + 1, len(val_loader))
-        if val_idx > 10 and args.test_mode:
-            break
+        # if val_idx % 1000 == 0:
+        #     if args.local_rank == 0:
+        #         print(f"validating: {val_idx + 1}/{len(val_loader)}")
+        # if val_idx > 10 and args.test_mode:
+        #     break
 
         # Image Dumps
         if val_idx < 10:
@@ -474,7 +499,7 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
 
     if args.local_rank == 0:
         evaluate_eval(args, net, optim, scheduler, val_loss, iou_acc, dump_images,
-                    writer, curr_epoch, dataset, None, curr_iter, save_pth=save_pth)
+                      writer, curr_epoch, dataset, None, curr_iter, save_pth=save_pth)
 
         if args.use_wtloss:
             visualize_matrix(writer, f_cor_arr, curr_iter, '/Covariance/Feature-')
@@ -507,9 +532,9 @@ def validate_for_cov_stat(val_loader, dataset, net, criterion, optim, scheduler,
         del img_or, img_photometric, img_geometric
 
         # Logging
-        if val_idx % 20 == 0:
+        if val_idx % 100 == 0:
             if args.local_rank == 0:
-                logging.info("validating: %d / 100", val_idx + 1)
+                print("validating: %d / 100", val_idx + 1)
         del data
 
         if val_idx >= 499:

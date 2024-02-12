@@ -54,7 +54,7 @@ class GlobalAvgPool2d(nn.Module):
 
     def __init__(self):
         super(GlobalAvgPool2d, self).__init__()
-        logging.info("Global Average Pooling Initialized")
+        print("Global Average Pooling Initialized")
 
     def forward(self, inputs):
         in_size = inputs.size()

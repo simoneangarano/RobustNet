@@ -55,7 +55,7 @@ def make_exp_name(args, parser):
                 arg_str = 'T' if dict_args[argname] else 'F'
             else:
                 arg_str = str(dict_args[argname])[:7]
-            if argname is not '':
+            if argname != '':
                 exp_name += '_{}_{}'.format(str(argname), arg_str)
             else:
                 exp_name += '_{}'.format(arg_str)
@@ -130,13 +130,14 @@ def evaluate_eval_for_inference(hist, dataset=None):
     print_evaluate_results(hist, iu, dataset=dataset)
     freq = hist.sum(axis=1) / hist.sum()
     mean_iu = np.nanmean(iu)
-    logging.info('mean {}'.format(mean_iu))
+    print('mean {}'.format(mean_iu))
     fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
     return acc, acc_cls, mean_iu, fwavacc
 
 
 
-def evaluate_eval(args, net, optimizer, scheduler, val_loss, hist, dump_images, writer, epoch=0, dataset_name=None, dataset=None, curr_iter=0, optimizer_at=None, scheduler_at=None, save_pth=True):
+def evaluate_eval(args, net, optimizer, scheduler, val_loss, hist, dump_images, writer, epoch=0, 
+                  dataset_name=None, dataset=None, curr_iter=0, optimizer_at=None, scheduler_at=None, save_pth=True):
     """
     Modified IOU mechanism for on-the-fly IOU calculations ( prevents memory overflow for
     large dataset) Only applies to eval/eval.py
@@ -151,7 +152,7 @@ def evaluate_eval(args, net, optimizer, scheduler, val_loss, hist, dump_images, 
         print_evaluate_results(hist, iu, dataset_name=dataset_name, dataset=dataset)
         freq = hist.sum(axis=1) / hist.sum()
         mean_iu = np.nanmean(iu)
-        logging.info('mean {}'.format(mean_iu))
+        print(f'mIoU: {mean_iu:.4f}')
         fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
     else:
         mean_iu = 0
@@ -230,21 +231,19 @@ def evaluate_eval(args, net, optimizer, scheduler, val_loss, hist, dump_images, 
                 best_snapshot = os.path.join(args.exp_path, best_snapshot)
                 shutil.copyfile(last_snapshot, best_snapshot)
         else:
-            logging.info("Saved file to {}".format(last_snapshot))
+            print("Saved file to {}".format(last_snapshot))
 
     if val_loss is not None and hist is not None:
-        logging.info('-' * 107)
-        fmt_str = '[epoch %d], [dataset name %s], [val loss %.5f], [acc %.5f], [acc_cls %.5f], ' +\
-                  '[mean_iu %.5f], [fwavacc %.5f]'
-        logging.info(fmt_str % (epoch, dataset_name, val_loss.avg, acc, acc_cls, mean_iu, fwavacc))
+        print('-' * 100)
+        fmt_str = '[%d][%s] \t loss %.5f acc %.5f acc_cls %.5f miou %.5f fwavacc %.5f'
+        print(fmt_str % (epoch, dataset_name, val_loss.avg, acc, acc_cls, mean_iu, fwavacc))
         if save_pth:
-            fmt_str = 'best record: [dataset name %s], [val loss %.5f], [acc %.5f], [acc_cls %.5f], ' +\
-                      '[mean_iu %.5f], [fwavacc %.5f], [epoch %d], '
-            logging.info(fmt_str % (dataset_name,
-                                    args.best_record[dataset_name]['val_loss'], args.best_record[dataset_name]['acc'],
-                                    args.best_record[dataset_name]['acc_cls'], args.best_record[dataset_name]['mean_iu'],
-                                    args.best_record[dataset_name]['fwavacc'], args.best_record[dataset_name]['epoch']))
-            logging.info('-' * 107)
+            fmt_str = 'Best: [%d][%s] \t loss %.5f acc %.5f acc_cls %.5f miou %.5f fwavacc %.5f'
+            print(fmt_str % (args.best_record[dataset_name]['epoch'], dataset_name,
+                             args.best_record[dataset_name]['val_loss'], args.best_record[dataset_name]['acc'],
+                             args.best_record[dataset_name]['acc_cls'], args.best_record[dataset_name]['mean_iu'],
+                             args.best_record[dataset_name]['fwavacc']))
+            print('-' * 100)
 
         if writer:
             # tensorboard logging of validation phase metrics
@@ -267,25 +266,25 @@ def print_evaluate_results(hist, iu, dataset_name=None, dataset=None):
     iu_false_negative = hist.sum(axis=0) - np.diag(hist)
     iu_true_positive = np.diag(hist)
 
-    logging.info('Dataset name: {}'.format(dataset_name))
-    logging.info('IoU:')
-    logging.info('label_id      label    iU    Precision Recall TP     FP    FN')
+    print('Dataset name: {}'.format(dataset_name))
+    print('IoU:')
+    print('id\tlabel\tIoU\tPrec\tRec\tTP\tFP\tFN')
     for idx, i in enumerate(iu):
         # Format all of the strings:
         idx_string = "{:2d}".format(idx)
-        class_name = "{:>13}".format(id2cat[idx]) if idx in id2cat else ''
+        class_name = "{:2d}".format(id2cat[idx]) if idx in id2cat else ''
         iu_string = '{:5.1f}'.format(i * 100)
         total_pixels = hist.sum()
         tp = '{:5.1f}'.format(100 * iu_true_positive[idx] / total_pixels)
-        fp = '{:5.1f}'.format(
-            iu_false_positive[idx] / iu_true_positive[idx])
+        fp = '{:5.1f}'.format(iu_false_positive[idx] / iu_true_positive[idx])
         fn = '{:5.1f}'.format(iu_false_negative[idx] / iu_true_positive[idx])
         precision = '{:5.1f}'.format(
             iu_true_positive[idx] / (iu_true_positive[idx] + iu_false_positive[idx]))
         recall = '{:5.1f}'.format(
             iu_true_positive[idx] / (iu_true_positive[idx] + iu_false_negative[idx]))
-        logging.info('{}    {}   {}  {}     {}  {}   {}   {}'.format(
+        print('{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}'.format(
             idx_string, class_name, iu_string, precision, recall, tp, fp, fn))
+    print()
 
 
 

@@ -177,7 +177,7 @@ args.world_size = 1
 
 # Test Mode run two epochs with a few iterations of training and val
 if args.test_mode:
-    args.max_epoch = 2
+    args.max_epoch = 1
 
 if 'WORLD_SIZE' in os.environ:
     # args.apex = int(os.environ['WORLD_SIZE']) > 1
@@ -185,7 +185,7 @@ if 'WORLD_SIZE' in os.environ:
     print("Total world size: ", int(os.environ['WORLD_SIZE']))
 
 torch.cuda.set_device(args.local_rank)
-print('My Rank:', args.local_rank)
+# print('My Rank:', args.local_rank)
 # Initialize distributed communication
 args.dist_url = args.dist_url + str(8000 + (int(time.time()%1000))//10)
 
@@ -288,11 +288,11 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
         predictions = output.data.max(1)[1].cpu()
 
         # Logging
-        if val_idx % 20 == 0:
+        if val_idx % 100 == 0:
             if args.local_rank == 0:
-                logging.info("validating: %d / %d", val_idx + 1, len(val_loader))
-        if val_idx > 10 and args.test_mode:
-            break
+                print("validating: %d / %d", val_idx + 1, len(val_loader))
+        # if val_idx > 10 and args.test_mode:
+        #     break
 
         # Image Dumps
         if val_idx < 10:

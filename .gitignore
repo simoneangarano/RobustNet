@@ -139,3 +139,6 @@ pretrained/
 
 # json files
 *.json
+
+# custom
+bin/

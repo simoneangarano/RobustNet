@@ -34,7 +34,7 @@ from network.instance_whitening import instance_whitening_loss, get_covariance_m
 from network.mynn import initialize_weights, Norm2d, Upsample, freeze_weights, unfreeze_weights
 
 import torchvision.models as models
-
+import torch.nn.functional as F
 
 class _AtrousSpatialPyramidPoolingModule(nn.Module):
     """
@@ -53,7 +53,7 @@ class _AtrousSpatialPyramidPoolingModule(nn.Module):
 
         # Check if we are using distributed BN and use the nn from encoding.nn
         # library rather than using standard pytorch.nn
-        print("output_stride = ", output_stride)
+        # print("output_stride = ", output_stride)
         if output_stride == 8:
             rates = [2 * r for r in rates]
         elif output_stride == 4:
@@ -474,7 +474,7 @@ class DeepV3Plus(nn.Module):
             self.cov_matrix_layer[index].reset_mask_matrix()
 
 
-    def forward(self, x, gts=None, aux_gts=None, img_gt=None, visualize=False, cal_covstat=False, apply_wtloss=True):
+    def forward(self, x, gts=None, aux_gts=None, img_gt=None, visualize=False, cal_covstat=False, apply_wtloss=True, t_out=None):
         w_arr = []
 
         if cal_covstat:
@@ -566,17 +566,26 @@ class DeepV3Plus(nn.Module):
                         wt_loss = wt_loss + loss
                 wt_loss = wt_loss / len(w_arr)
 
+            if self.args.kd and t_out is not None:
+                main_out = F.log_softmax(main_out, dim=1)
+                t_out = F.softmax(t_out, dim=1)
+                kd_loss = F.kl_div(main_out, t_out, reduction='batchmean')
+            else:
+                kd_loss = torch.FloatTensor([0]).cuda()
+
             aux_out = self.dsn(aux_out)
             if aux_gts.dim() == 1:
                 aux_gts = gts
             aux_gts = aux_gts.unsqueeze(1).float()
             aux_gts = nn.functional.interpolate(aux_gts, size=aux_out.shape[2:], mode='nearest')
-            aux_gts = aux_gts.squeeze(1).long()
+            aux_gts = aux_gts.squeeze(1).long().cuda()
             loss2 = self.criterion_aux(aux_out, aux_gts)
 
             return_loss = [loss1, loss2]
             if self.args.use_wtloss:
                 return_loss.append(wt_loss)
+            if self.args.xded and t_out is not None:
+                return_loss.append(kd_loss)
 
             if self.args.use_wtloss and visualize:
                 f_cor_arr = []
