@@ -230,7 +230,7 @@ class Mapillary(data.Dataset):
         #     self.imgs = self.imgs[:200]
 
         if self.class_uniform_pct > 0:
-            json_fn = 'mapillary_tile{}.json'.format(self.class_uniform_tile)
+            json_fn = 'bin/mapillary_tile{}.json'.format(self.class_uniform_tile)
             if os.path.isfile(json_fn):
                 with open(json_fn, 'r') as json_data:
                     centroids = json.load(json_data)

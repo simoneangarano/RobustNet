@@ -18,7 +18,7 @@ import torch
 # trainid_to_name = cityscapes_labels.trainId2name
 # id_to_trainid = cityscapes_labels.label2trainid
 num_classes = 11
-ignore_label = 11
+ignore_label = 255
 root = cfg.DATASET.CAMVID_DIR
 
 palette = [128, 128, 128, 
@@ -184,7 +184,7 @@ class CAMVID(data.Dataset):
 
         # Centroids for GT data
         if self.class_uniform_pct > 0:
-            json_fn = 'camvid_tile{}_cv{}_{}.json'.format(self.class_uniform_tile, self.cv_split, self.mode)
+            json_fn = 'bin/camvid_tile{}_cv{}_{}.json'.format(self.class_uniform_tile, self.cv_split, self.mode)
 
             if os.path.isfile(json_fn):
                 with open(json_fn, 'r') as json_data:

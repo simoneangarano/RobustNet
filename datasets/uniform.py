@@ -15,6 +15,7 @@ from PIL import Image
 import numpy as np
 from scipy import ndimage
 from tqdm import tqdm
+import imageio
 
 pbar = None
 
@@ -57,8 +58,8 @@ def class_centroids_image(item, tile_size, num_classes, id2trainid):
     centroids = defaultdict(list)
     mask = np.array(Image.open(label_fn))
     if len(mask.shape) == 3:
-        # Remove instance mask
-        mask = mask[:,:,0]
+        # use FI reading
+        mask = imageio.imread(label_fn, format='PNG-FI')[:,:,0]
     image_size = mask.shape
     tile_locations = calc_tile_locations(tile_size, image_size)
 
@@ -80,7 +81,7 @@ def class_centroids_image(item, tile_size, num_classes, id2trainid):
     pbar.update(1)
     return centroids
 
-import scipy.misc as m
+import imageio.v3 as m
 
 def class_centroids_image_from_color(item, tile_size, num_classes, id2trainid):
     """
@@ -123,7 +124,8 @@ def class_centroids_image_from_color(item, tile_size, num_classes, id2trainid):
             #     print(k, v, "num", np.count_nonzero(mask == np.array(k)))
             # break
             if v != 255 and v != -1:
-                mask_copy[(mask == np.array(k))[:,:,0] & (mask == np.array(k))[:,:,1] & (mask == np.array(k))[:,:,2]] = v
+                sel_mask = np.logical_and(mask[:, :, 0] == np.array(k)[0], mask[:, :, 1] == np.array(k)[1], mask[:, :, 2] == np.array(k)[2]) 
+                mask_copy[sel_mask] = v
     mask = mask_copy
 
     # mask_copy = mask.copy()
@@ -194,6 +196,10 @@ def pooled_class_centroids_all(items, num_classes, id2trainid, tile_size=1024):
     new_centroids = pool.map(class_centroids_item, items)
     pool.close()
     pool.join()
+    # new_centroids = []
+    # for item in items:
+    #     new_centroids.append(class_centroids_image(item=item, num_classes=num_classes,
+    #                                                id2trainid=id2trainid, tile_size=tile_size))
 
     # combine each image's items into a single global dict
     for image_items in new_centroids:
@@ -269,10 +275,10 @@ def build_epoch(imgs, centroids, num_classes, class_uniform_pct):
     num_classes:
     class_uniform_pct: class uniform sampling percent ( % of uniform images in one epoch )
     """
-    print("Class Uniform Percentage: %s", str(class_uniform_pct))
+    print(f"Class Uniform Percentage: {class_uniform_pct}%")
     num_epoch = int(len(imgs))
 
-    print('Class Uniform items per Epoch:%s', str(num_epoch))
+    print(f'Class Uniform items per Epoch:{str(num_epoch)}')
     num_per_class = int((num_epoch * class_uniform_pct) / num_classes)
     num_rand = num_epoch - num_per_class * num_classes
     # create random crops
@@ -280,10 +286,11 @@ def build_epoch(imgs, centroids, num_classes, class_uniform_pct):
 
     # now add uniform sampling
     for class_id in range(num_classes):
-        string_format = "cls %d len %d"% (class_id, len(centroids[class_id]))
+
+        string_format = "cls %d len %d"% (class_id, len(centroids[class_id]) if class_id in centroids.keys() else 0)
         print(string_format)
     for class_id in range(num_classes):
-        centroid_len = len(centroids[class_id])
+        centroid_len = len(centroids[class_id]) if class_id in centroids.keys() else 0
         if centroid_len == 0:
             pass
         else:

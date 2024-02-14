@@ -160,19 +160,22 @@ parser.add_argument('--use_isw', action='store_true', default=False,
 
 parser.add_argument('--kd', action='store_true', default=False)
 parser.add_argument('--weights_dir', type=str, default='./bin/')
+parser.add_argument('--return_list', action='store_true', default=False)
+parser.add_argument('--reproduce', action='store_true', default=False)
 
 args = parser.parse_args()
 
-# Enable CUDNN Benchmarking optimization
-#torch.backends.cudnn.benchmark = True
-random_seed = cfg.RANDOM_SEED  #304
-torch.manual_seed(random_seed)
-torch.cuda.manual_seed(random_seed)
-torch.cuda.manual_seed_all(random_seed) # if use multi-GPU
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-np.random.seed(random_seed)
-random.seed(random_seed)
+if args.reproduce:
+    random_seed = cfg.RANDOM_SEED  #304
+    torch.manual_seed(random_seed)
+    torch.cuda.manual_seed(random_seed)
+    torch.cuda.manual_seed_all(random_seed) # if use multi-GPU
+    torch.backends.cudnn.deterministic = False
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(random_seed)
+    random.seed(random_seed)
+else:
+    torch.backends.cudnn.benchmark = True
 
 args.world_size = 1
 

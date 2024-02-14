@@ -13,14 +13,17 @@ import torch
 import torchvision.transforms as transforms
 import datasets.uniform as uniform
 import datasets.cityscapes_labels as cityscapes_labels
-import scipy.misc as m
+import imageio.v3 as m
 
 from config import cfg
 
 trainid_to_name = cityscapes_labels.trainId2name
-id_to_trainid = cityscapes_labels.label2trainid
+# id_to_trainid = cityscapes_labels.label2trainid
 trainid_to_trainid = cityscapes_labels.trainId2trainId
 color_to_trainid = cityscapes_labels.color2trainId
+id_to_trainid = {7: 0, 8: 1, 11: 2, 12: 3, 13: 4, 17: 5,
+                 19: 6, 20: 7, 21: 8, 22: 9, 23: 10, 24: 11, 25: 12,
+                 26: 13, 27: 14, 28: 15, 31: 16, 32: 17, 33: 18}
 num_classes = 19
 ignore_label = 255
 root = cfg.DATASET.GTAV_DIR
@@ -31,6 +34,7 @@ palette = [128, 64, 128, 244, 35, 232, 70, 70, 70, 102, 102, 156, 190, 153, 153,
            220, 220, 0, 107, 142, 35, 152, 251, 152, 70, 130, 180, 220, 20, 60,
            255, 0, 0, 0, 0, 142, 0, 0, 70,
            0, 60, 100, 0, 80, 100, 0, 0, 230, 119, 11, 32]
+
 zero_pad = 256 * 3 - len(palette)
 for i in range(zero_pad):
     palette.append(0)
@@ -238,7 +242,7 @@ class GTAV(data.Dataset):
     def __getitem__(self, index):
 
         img_path, mask_path = self.imgs[index]
-        img, mask = Image.open(img_path).convert('RGB'), np.array(Image.open(mask_path))
+        img, mask = Image.open(img_path).convert('RGB'), m.imread(mask_path)
         img_name = os.path.splitext(os.path.basename(img_path))[0]
 
         while (img.size[1], img.size[0]) != mask.shape:
@@ -256,9 +260,12 @@ class GTAV(data.Dataset):
         image_size = mask.shape
         mask_copy = np.full(image_size, ignore_label, dtype=np.uint8)
 
-        for k, v in color_to_trainid.items():
-            if v != 255 and v != -1:
-                mask_copy[(mask == np.array(k))] = v
+        for k, v in id_to_trainid.items():
+            mask_copy[mask == k] = v
+
+        # for k, v in color_to_trainid.items():
+        #     if v != 255 and v != -1:
+        #         mask_copy[(mask == np.array(k))] = v
 
         # for k, v in color_to_trainid.items():
         #     mask_copy[(mask == np.array(k))[:,:,0]] = v
@@ -319,7 +326,7 @@ class GTAVUniform(data.Dataset):
                  transform=None, target_transform=None, target_aux_transform=None, dump_images=False,
                  cv_split=None, class_uniform_pct=0.5, class_uniform_tile=1024,
                  test=False, coarse_boost_classes=None, is_additional=False, image_in=False,
-                 extract_feature=False):
+                 extract_feature=False, max_iters=None):
         self.mode = mode
         self.maxSkip = maxSkip
         self.joint_transform_list = joint_transform_list
@@ -347,8 +354,13 @@ class GTAVUniform(data.Dataset):
         self.imgs, self.aug_imgs = make_dataset(mode, self.maxSkip, cv_split=self.cv_split)
         assert len(self.imgs), 'Found 0 images, please check the data set'
 
+        if max_iters:
+            random.seed(0)
+            self.imgs = random.sample(self.imgs, max_iters)
+        print('GTAV-{}: {} images'.format(mode, len(self.imgs)))
+
         # Centroids for fine data
-        json_fn = 'gtav_{}_cv{}_tile{}.json'.format(
+        json_fn = 'bin/gtav_{}_cv{}_tile{}.json'.format(
             self.mode, self.cv_split, self.class_uniform_tile)
         if os.path.isfile(json_fn):
             with open(json_fn, 'r') as json_data:
@@ -358,10 +370,10 @@ class GTAVUniform(data.Dataset):
 
             self.centroids = {int(idx): centroids[idx] for idx in centroids}
         else:
-            self.centroids = uniform.class_centroids_all_from_color(
+            self.centroids = uniform.class_centroids_all(
                 self.imgs,
                 num_classes,
-                id2trainid=color_to_trainid,
+                id2trainid=id_to_trainid,
                 tile_size=class_uniform_tile)
             with open(json_fn, 'w') as outfile:
                 json.dump(self.centroids, outfile, indent=4)
@@ -424,9 +436,9 @@ class GTAVUniform(data.Dataset):
         img, mask = Image.open(img_path).convert('RGB'), m.imread(mask_path)
         img_name = os.path.splitext(os.path.basename(img_path))[0]
 
-        # print(img.size, mask[:,:,0].shape)
-        while (img.size[1], img.size[0]) != mask[:,:,0].shape:
-            print("Error!!", img.size, mask[:,:,0].shape, img_name)
+        # print(img.size, mask.shape)
+        while (img.size[1], img.size[0]) != mask.shape:
+            print("Error!!", img.size, mask.shape, img_name)
             print("Dropping ", str(index))
             # index = index + 1
             if index + 1 == len(self.imgs):
@@ -437,13 +449,19 @@ class GTAVUniform(data.Dataset):
             img, mask = Image.open(img_path).convert('RGB'), m.imread(mask_path)
             img_name = os.path.splitext(os.path.basename(img_path))[0]
 
-        image_size = mask[:,:,0].shape
+        image_size = mask.shape
         mask_copy = np.full(image_size, ignore_label, dtype=np.uint8)
 
-        for k, v in color_to_trainid.items():
-            if v != 255 and v != -1:
-                mask_copy[(mask == np.array(k))[:,:,0] & (mask == np.array(k))[:,:,1] & (mask == np.array(k))[:,:,2]] = v
+        for k, v in id_to_trainid.items():
+            mask_copy[mask == k] = v
 
+        # for k, v in color_to_trainid.items():
+        #     if v != 255 and v != -1:
+        #         mask_copy[(mask == np.array(k))] = v
+
+        # for k, v in color_to_trainid.items():
+        #     mask_copy[(mask == np.array(k))[:,:,0]] = v
+            
         # for k, v in color_to_trainid.items():
         #     mask_copy[(mask == np.array(k))[:,:,0]] = v
 

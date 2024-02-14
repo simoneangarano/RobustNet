@@ -16,7 +16,6 @@ import torchvision.transforms as standard_transforms
 import transforms.joint_transforms as joint_transforms
 import transforms.transforms as extended_transforms
 from torch.utils.data import DataLoader, ConcatDataset
-import torch
 
 
 num_classes = 19
@@ -533,6 +532,10 @@ def setup_loaders(args):
 
     # Define new train data set that has all the train sets
     # Define new val data set that has all the val sets
+
+    if args.return_list:
+        return [t.imgs for t in train_sets], [t.imgs for t in val_sets], val_dataset_names
+    
     val_loaders = {}
     if len(args.dataset) != 1:
         if args.image_uniform_sampling:

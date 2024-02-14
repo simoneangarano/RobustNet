@@ -584,7 +584,7 @@ class DeepV3Plus(nn.Module):
             return_loss = [loss1, loss2]
             if self.args.use_wtloss:
                 return_loss.append(wt_loss)
-            if self.args.xded and t_out is not None:
+            if self.args.kd and t_out is not None:
                 return_loss.append(kd_loss)
 
             if self.args.use_wtloss and visualize:

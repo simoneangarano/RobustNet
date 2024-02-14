@@ -334,7 +334,7 @@ class SynthiaUniform(data.Dataset):
     def __init__(self, mode, maxSkip=0, joint_transform_list=None, sliding_crop=None,
                  transform=None, target_transform=None, target_aux_transform=None, dump_images=False,
                  cv_split=None, class_uniform_pct=0.5, class_uniform_tile=1024,
-                 test=False, coarse_boost_classes=None, image_in=False, extract_feature=False):
+                 test=False, coarse_boost_classes=None, image_in=False, extract_feature=False, max_iters=None):
         self.mode = mode
         self.maxSkip = maxSkip
         self.joint_transform_list = joint_transform_list
@@ -361,8 +361,13 @@ class SynthiaUniform(data.Dataset):
         self.imgs, self.aug_imgs = make_dataset(mode, self.maxSkip, cv_split=self.cv_split)
         assert len(self.imgs), 'Found 0 images, please check the data set'
 
+        if max_iters:
+            random.seed(0)
+            self.imgs = random.sample(self.imgs, max_iters)
+            print('Synthia-{}: {} images'.format(mode, len(self.imgs)))
+        
         # Centroids for fine data
-        json_fn = 'synthia_{}_cv{}_tile{}.json'.format(
+        json_fn = 'bin/synthia_{}_cv{}_tile{}.json'.format(
             self.mode, self.cv_split, self.class_uniform_tile)
         if os.path.isfile(json_fn):
             with open(json_fn, 'r') as json_data:
