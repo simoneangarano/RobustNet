@@ -64,6 +64,14 @@ def make_exp_name(args, parser):
 
 def fast_hist(label_pred, label_true, num_classes):
     mask = (label_true >= 0) & (label_true < num_classes)
+    # if 18 in label_true:
+    #     print("18 in label_true")
+    # if 18 in label_pred:
+    #     print("18 in label_pred")
+    # if 16 in label_true:
+    #     print("16 in label_true")
+    # if 16 in label_pred:
+    #     print("16 in label_pred")
     hist = np.bincount(
         num_classes * label_true[mask].astype(int) +
         label_pred[mask], minlength=num_classes ** 2).reshape(num_classes, num_classes)
@@ -235,10 +243,10 @@ def evaluate_eval(args, net, optimizer, scheduler, val_loss, hist, dump_images, 
 
     if val_loss is not None and hist is not None:
         print('-' * 100)
-        fmt_str = '[%d][%s] \t loss %.5f acc %.5f acc_cls %.5f miou %.5f fwavacc %.5f'
+        fmt_str = '[%d][%s] \tloss %.5f acc %.5f acc_cls %.5f miou %.5f fwavacc %.5f'
         print(fmt_str % (epoch, dataset_name, val_loss.avg, acc, acc_cls, mean_iu, fwavacc))
         if save_pth:
-            fmt_str = 'Best: [%d][%s] \t loss %.5f acc %.5f acc_cls %.5f miou %.5f fwavacc %.5f'
+            fmt_str = 'Best: [%d][%s]\tloss %.5f acc %.5f acc_cls %.5f miou %.5f fwavacc %.5f'
             print(fmt_str % (args.best_record[dataset_name]['epoch'], dataset_name,
                              args.best_record[dataset_name]['val_loss'], args.best_record[dataset_name]['acc'],
                              args.best_record[dataset_name]['acc_cls'], args.best_record[dataset_name]['mean_iu'],

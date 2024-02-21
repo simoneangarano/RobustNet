@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
     # Example on Cityscapes
     python train.py \
-        --dataset cityscapes --val_dataset cityscapes \
+        --dataset mapillary --val_dataset mapillary \
         --arch network.deepv3.DeepR50V3PlusD \
         --city_mode train \
         --sgd \
@@ -20,10 +20,10 @@
         --gblur \
         --color_aug 0.5 \
         --date 0214 \
-        --exp cityscapes \
+        --exp mapillary \
         --ckpt ./logs/ \
         --tb_path ./logs/ \
         --wt_reg_weight 0.0 \
         --relax_denom 0.0 \
         --cov_stat_epoch 0 \
-        --wt_layer 0 0 0 0 0 0 0 2>&1 | tee logs/cityscapes.txt
+        --wt_layer 0 0 0 0 0 0 0 2>&1 | tee logs/mapillary.txt

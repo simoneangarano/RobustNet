@@ -275,7 +275,7 @@ def build_epoch(imgs, centroids, num_classes, class_uniform_pct):
     num_classes:
     class_uniform_pct: class uniform sampling percent ( % of uniform images in one epoch )
     """
-    print(f"Class Uniform Percentage: {class_uniform_pct}%")
+    print(f"Class Uniform Percentage: {class_uniform_pct*100}%")
     num_epoch = int(len(imgs))
 
     print(f'Class Uniform items per Epoch:{str(num_epoch)}')
@@ -286,9 +286,9 @@ def build_epoch(imgs, centroids, num_classes, class_uniform_pct):
 
     # now add uniform sampling
     for class_id in range(num_classes):
-
         string_format = "cls %d len %d"% (class_id, len(centroids[class_id]) if class_id in centroids.keys() else 0)
         print(string_format)
+        
     for class_id in range(num_classes):
         centroid_len = len(centroids[class_id]) if class_id in centroids.keys() else 0
         if centroid_len == 0:

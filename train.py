@@ -247,7 +247,7 @@ def main():
         else:
             epoch = 0
 
-    print("\n### Epoch", i)
+    # print("\n### Epoch", i)
     torch.cuda.empty_cache()
     # Main Loop
     # for epoch in range(args.start_epoch, args.max_epoch):
@@ -378,10 +378,10 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter, tea
                 total_loss = total_loss + (args.wt_reg_weight * wt_loss)
             if args.kd:
                 kd_loss = outputs[outputs_index]
-                total_loss = total_loss + kd_loss
+                total_loss = total_loss + (args.kd_weight * kd_loss)
                 outputs_index += 1
             else:
-                wt_loss = 0
+                wt_loss, kd_loss = 0, 0
 
             if args.visualize_feature:
                 f_cor_arr = outputs[outputs_index]
@@ -404,17 +404,18 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter, tea
                     if args.visualize_feature:
                         visualize_matrix(writer, f_cor_arr, curr_iter, '/Covariance/Feature-')
 
-                    msg = '[{}][{}/{}] \t loss {:0.6f} \t lr {:.1e} \t time {:0.2f}'.format(
-                        curr_epoch, curr_iter, max_iter, train_total_loss.avg,
-                        optim.param_groups[-1]['lr'], time_meter.avg / args.train_batch_size)
+                    msg = '[{}][{}/{}]\tlr {:.1e} \t time {:0.2f} \t loss {:0.6f} '.format(
+                        curr_epoch, curr_iter, max_iter, optim.param_groups[-1]['lr'], 
+                        time_meter.avg / args.train_batch_size, train_total_loss.avg)
 
-                    print(msg)
                     if args.use_wtloss:
-                        print("Whitening Loss", wt_loss)
+                        msg += f"\t wt_loss {wt_loss:0.6f}"
+                    if args.kd:
+                        msg += f"\tkd_loss {kd_loss:0.6f}"
+                    print(msg)
 
                     # Log tensorboard metrics for each iteration of the training phase
-                    writer.add_scalar('loss/train_loss', (train_total_loss.avg),
-                                    curr_iter)
+                    writer.add_scalar('loss/train_loss', (train_total_loss.avg), curr_iter)
                     train_total_loss.reset()
                     time_meter.reset()
 
@@ -442,12 +443,11 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
     net.eval()
     val_loss = AverageMeter()
     iou_acc = 0
-    error_acc = 0
     dump_images = []
 
     for val_idx, data in enumerate(val_loader):
         # input        = torch.Size([1, 3, 713, 713])
-        # gt_image           = torch.Size([1, 713, 713])
+        # gt_image     = torch.Size([1, 713, 713])
         inputs, gt_image, img_names, _ = data
 
         if len(inputs.shape) == 5:
@@ -466,14 +466,12 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
                 output, f_cor_arr = net(inputs, visualize=True)
             else:
                 output = net(inputs)
-
         del inputs
 
         assert output.size()[2:] == gt_image.size()[1:]
         assert output.size()[1] == datasets.num_classes
 
         val_loss.update(criterion(output, gt_cuda).item(), batch_pixel_size)
-
         del gt_cuda
 
         # Collect data from different GPU to a single GPU since

@@ -19,10 +19,10 @@ def get_optimizer(args, net):
 
     if args.sgd:
         optimizer = optim.SGD(base_params,
-                            lr=args.lr,
-                            weight_decay=5e-4, #args.weight_decay,
-                            momentum=args.momentum,
-                            nesterov=False)
+                              lr=args.lr,
+                              weight_decay=5e-4, #args.weight_decay,
+                              momentum=args.momentum,
+                              nesterov=False)
     else:
         raise ValueError('Not a valid optimizer')
 

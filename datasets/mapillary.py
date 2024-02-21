@@ -140,14 +140,14 @@ def make_dataset(quality, mode):
     img_dir_name = None
     if quality == 'semantic':
         if mode == 'train':
-            img_dir_name = 'training/v1.2'
+            img_dir_name = 'training/'
         if mode == 'val':
-            img_dir_name = 'validation/v1.2'
-        mask_path = os.path.join(root, img_dir_name, 'labels')
+            img_dir_name = 'validation/'
+        mask_path = os.path.join(root, img_dir_name, 'v1.2/labels')
     else:
         raise BaseException("Instance Segmentation Not support")
 
-    img_path = os.path.join(root, img_dir_name, 'instances')
+    img_path = os.path.join(root, img_dir_name, 'images')
     if quality != 'video':
         imgs = sorted([os.path.splitext(f)[0] for f in os.listdir(img_path)])
         msks = sorted([os.path.splitext(f)[0] for f in os.listdir(mask_path)])
