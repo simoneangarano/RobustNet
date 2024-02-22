@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-    # Example on Cityscapes
     python train.py \
-        --dataset mapillary --val_dataset mapillary \
+        --dataset bdd100k cityscapes mapillary synthia --val_dataset gtav \
         --arch network.deepv3.DeepR50V3PlusD \
         --city_mode train \
         --sgd \
@@ -16,14 +15,18 @@
         --scale_max 2.0 \
         --rrotate 0 \
         --max_iter 40000 \
-        --bs_mult 8 \
+        --bs_mult 2 \
         --gblur \
         --color_aug 0.5 \
         --date 0214 \
-        --exp mapillary \
+        --exp erm \
         --ckpt ./logs/ \
         --tb_path ./logs/ \
         --wt_reg_weight 0.0 \
         --relax_denom 0.0 \
         --cov_stat_epoch 0 \
-        --wt_layer 0 0 0 0 0 0 0 2>&1 | tee logs/mapillary.txt
+        --wt_layer 0 0 0 0 0 0 0 \
+        # --snapshot bin/kd_gtav.pth \
+        # --eval \
+        # --kd 1 \
+        2>&1 | tee logs/erm.txt 

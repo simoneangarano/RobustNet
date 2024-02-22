@@ -36,10 +36,10 @@ def get_loss(args):
     else:
         # print("standard cross entropy")
         criterion = nn.CrossEntropyLoss(weight=ce_weight, reduction='mean',
-                                       ignore_index=datasets.ignore_label).cuda()
+                                        ignore_index=datasets.ignore_label).cuda()
 
     criterion_val = nn.CrossEntropyLoss(reduction='mean',
-                                       ignore_index=datasets.ignore_label).cuda()
+                                        ignore_index=datasets.ignore_label).cuda()
     return criterion, criterion_val
 
 def get_loss_by_epoch(args):
@@ -342,4 +342,23 @@ class ImgWtLossSoftNLL_by_epoch(nn.Module):
                                           class_weights=torch.Tensor(class_weights).cuda(),
                                           border_weights=weights, mask=ignore_mask[i])
 
+        return loss
+
+class KDLoss(torch.nn.Module):
+    def __init__(self, temp_factor, channel_wise=False):
+        super(KDLoss, self).__init__()
+        self.temp_factor = temp_factor
+        self.kl_div = torch.nn.KLDivLoss(reduction="batchmean")
+        self.channel_wise = channel_wise
+
+    def forward(self, input, target):
+        if self.channel_wise:
+            input = input.permute(0, 2, 3, 1)
+            target = target.permute(0, 2, 3, 1)
+            B, H, W, C = input.size()
+            input = input.view(B, H*W, C)
+            target = target.view(B, H*W, C)
+        log_p = torch.log_softmax(input/self.temp_factor, dim=1)
+        q = torch.softmax(target/self.temp_factor, dim=1)
+        loss = self.kl_div(log_p, q)*(self.temp_factor**2)
         return loss

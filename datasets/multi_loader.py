@@ -6,10 +6,11 @@ import numpy as np
 from torch.utils.data import Dataset
 import torch
 from config import cfg
+import datasets.uniform as uniform
 
-
-np.random.seed(cfg.RANDOM_SEED)
-
+# np.random.seed(cfg.RANDOM_SEED)
+num_classes = 19
+ignore_label = 255
 
 class DomainUniformConcatDataset(Dataset):
     """
@@ -40,6 +41,7 @@ class DomainUniformConcatDataset(Dataset):
         self.lengths = [len(d) for d in datasets]
         self.offsets = self.cumsum(datasets)
         self.length = np.sum(self.lengths)
+        self.args = args
 
         print("# Domains: {}, Total length: {}, Per epoch: {}, Offsets: {}".format(
             str(len(datasets)), str(self.length), str(len(self)), str(self.offsets)))
@@ -94,3 +96,24 @@ class DomainUniformConcatDataset(Dataset):
 
         return imgs, masks, img_names, mask_auxs
 
+
+    def build_epoch(self, cut=False):
+        """
+        Perform Uniform Sampling per epoch to create a new list for training such that it
+        uniformly samples all classes
+        """
+        for dataset in self.datasets:
+            if self.args.class_uniform_pct > 0:
+                if cut:
+                    # after max_cu_epoch, we only fine images to fine tune
+                    dataset.imgs_uniform = uniform.build_epoch(dataset.imgs,
+                                                               dataset.fine_centroids,
+                                                               num_classes,
+                                                               cfg.CLASS_UNIFORM_PCT)
+                else:
+                    dataset.imgs_uniform = uniform.build_epoch(dataset.imgs + dataset.aug_imgs,
+                                                               dataset.centroids,
+                                                               num_classes,
+                                                               cfg.CLASS_UNIFORM_PCT)
+            else:
+                dataset.imgs_uniform = dataset.imgs

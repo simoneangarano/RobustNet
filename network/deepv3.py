@@ -32,7 +32,7 @@ from network import Shufflenet
 from network.cov_settings import CovMatrix_ISW, CovMatrix_IRW
 from network.instance_whitening import instance_whitening_loss, get_covariance_matrix
 from network.mynn import initialize_weights, Norm2d, Upsample, freeze_weights, unfreeze_weights
-
+from loss import KDLoss
 import torchvision.models as models
 import torch.nn.functional as F
 
@@ -113,6 +113,7 @@ class DeepV3Plus(nn.Module):
         super(DeepV3Plus, self).__init__()
         self.criterion = criterion
         self.criterion_aux = criterion_aux
+        self.kd_loss = KDLoss(temp_factor=args.kd_temp, channel_wise=True).cuda()
         self.variant = variant
         self.args = args
         self.trunk = trunk
@@ -474,7 +475,8 @@ class DeepV3Plus(nn.Module):
             self.cov_matrix_layer[index].reset_mask_matrix()
 
 
-    def forward(self, x, gts=None, aux_gts=None, img_gt=None, visualize=False, cal_covstat=False, apply_wtloss=True, t_out=None):
+    def forward(self, x, gts=None, aux_gts=None, img_gt=None, visualize=False, cal_covstat=False,
+                apply_wtloss=True, t_out=None):
         w_arr = []
 
         if cal_covstat:
@@ -567,9 +569,7 @@ class DeepV3Plus(nn.Module):
                 wt_loss = wt_loss / len(w_arr)
 
             if self.args.kd and t_out is not None:
-                main_out = F.log_softmax(main_out, dim=1)
-                t_out = F.softmax(t_out, dim=1)
-                kd_loss = F.kl_div(main_out, t_out, reduction='batchmean')
+                kd_loss = self.kd_loss(main_out, t_out)
             else:
                 kd_loss = torch.FloatTensor([0]).cuda()
 
@@ -614,7 +614,7 @@ def DeepR18V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     Resnet 18 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : ResNet-18")
+    # print("Model : DeepLabv3+, Backbone : ResNet-18")
     return DeepV3Plus(num_classes, trunk='resnet-18', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D32', skip='m1', args=args)
 
@@ -623,7 +623,7 @@ def DeepR50V3PlusD_OS8(args, num_classes, criterion, criterion_aux):
     """
     Resnet 50 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : ResNet-50")
+    # print("Model : DeepLabv3+, Backbone : ResNet-50")
     return DeepV3Plus(num_classes, trunk='resnet-50', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D', skip='m1', args=args)
 
@@ -631,7 +631,7 @@ def DeepR50V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     Resnet 50 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : ResNet-50")
+    # print("Model : DeepLabv3+, Backbone : ResNet-50")
     return DeepV3Plus(num_classes, trunk='resnet-50', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -639,7 +639,7 @@ def DeepR101V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     Resnet 101 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : ResNet-101")
+    # print("Model : DeepLabv3+, Backbone : ResNet-101")
     return DeepV3Plus(num_classes, trunk='resnet-101', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -647,7 +647,7 @@ def DeepR101V3PlusD_OS8(args, num_classes, criterion, criterion_aux):
     """
     Resnet 101 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : ResNet-101")
+    # print("Model : DeepLabv3+, Backbone : ResNet-101")
     return DeepV3Plus(num_classes, trunk='resnet-101', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D', skip='m1', args=args)
 
@@ -656,7 +656,7 @@ def DeepR152V3PlusD_OS8(args, num_classes, criterion, criterion_aux):
     """
     Resnet 152 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : ResNet-152")
+    # print("Model : DeepLabv3+, Backbone : ResNet-152")
     return DeepV3Plus(num_classes, trunk='resnet-152', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D', skip='m1', args=args)
 
@@ -666,7 +666,7 @@ def DeepResNext50V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     Resnext 50 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : ResNext-50 32x4d")
+    # print("Model : DeepLabv3+, Backbone : ResNext-50 32x4d")
     return DeepV3Plus(num_classes, trunk='resnext-50', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -674,7 +674,7 @@ def DeepResNext101V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     Resnext 101 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : ResNext-101 32x8d")
+    # print("Model : DeepLabv3+, Backbone : ResNext-101 32x8d")
     return DeepV3Plus(num_classes, trunk='resnext-101', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -682,7 +682,7 @@ def DeepWideResNet50V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     Wide ResNet 50 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : wide_resnet-50")
+    # print("Model : DeepLabv3+, Backbone : wide_resnet-50")
     return DeepV3Plus(num_classes, trunk='wide_resnet-50', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -690,7 +690,7 @@ def DeepWideResNet50V3PlusD_OS8(args, num_classes, criterion, criterion_aux):
     """
     Wide ResNet 50 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : wide_resnet-50")
+    # print("Model : DeepLabv3+, Backbone : wide_resnet-50")
     return DeepV3Plus(num_classes, trunk='wide_resnet-50', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D', skip='m1', args=args)
 
@@ -698,7 +698,7 @@ def DeepWideResNet101V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     Wide ResNet 101 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : wide_resnet-101")
+    # print("Model : DeepLabv3+, Backbone : wide_resnet-101")
     return DeepV3Plus(num_classes, trunk='wide_resnet-101', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -706,7 +706,7 @@ def DeepWideResNet101V3PlusD_OS8(args, num_classes, criterion, criterion_aux):
     """
     Wide ResNet 101 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : wide_resnet-101")
+    # print("Model : DeepLabv3+, Backbone : wide_resnet-101")
     return DeepV3Plus(num_classes, trunk='wide_resnet-101', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D', skip='m1', args=args)
 
@@ -715,7 +715,7 @@ def DeepResNext101V3PlusD_OS8(args, num_classes, criterion, criterion_aux):
     """
     ResNext 101 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : resnext-101")
+    # print("Model : DeepLabv3+, Backbone : resnext-101")
     return DeepV3Plus(num_classes, trunk='resnext-101', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D', skip='m1', args=args)
 
@@ -723,7 +723,7 @@ def DeepResNext101V3PlusD_OS4(args, num_classes, criterion, criterion_aux):
     """
     ResNext 101 Based Network
     """
-    print("Model : DeepLabv3+, Backbone : resnext-101")
+    # print("Model : DeepLabv3+, Backbone : resnext-101")
     return DeepV3Plus(num_classes, trunk='resnext-101', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D4', skip='m1', args=args)
 
@@ -731,7 +731,7 @@ def DeepShuffleNetV3PlusD_OS32(args, num_classes, criterion, criterion_aux):
     """
     ShuffleNet Based Network
     """
-    print("Model : DeepLabv3+, Backbone : shufflenetv2")
+    # print("Model : DeepLabv3+, Backbone : shufflenetv2")
     return DeepV3Plus(num_classes, trunk='shufflenetv2', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D32', skip='m1', args=args)
 
@@ -740,7 +740,7 @@ def DeepMNASNet05V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     MNASNET Based Network
     """
-    print("Model : DeepLabv3+, Backbone : mnas_0_5")
+    # print("Model : DeepLabv3+, Backbone : mnas_0_5")
     return DeepV3Plus(num_classes, trunk='mnasnet_05', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -748,7 +748,7 @@ def DeepMNASNet10V3PlusD(args, num_classes, criterion, criterion_aux):
     """
     MNASNET Based Network
     """
-    print("Model : DeepLabv3+, Backbone : mnas_1_0")
+    # print("Model : DeepLabv3+, Backbone : mnas_1_0")
     return DeepV3Plus(num_classes, trunk='mnasnet_10', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -757,7 +757,7 @@ def DeepShuffleNetV3PlusD(args, num_classes, criterion, criterion_aux):
     """
     ShuffleNet Based Network
     """
-    print("Model : DeepLabv3+, Backbone : shufflenetv2")
+    # print("Model : DeepLabv3+, Backbone : shufflenetv2")
     return DeepV3Plus(num_classes, trunk='shufflenetv2', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -765,7 +765,7 @@ def DeepMobileNetV3PlusD(args, num_classes, criterion, criterion_aux):
     """
     ShuffleNet Based Network
     """
-    print("Model : DeepLabv3+, Backbone : mobilenetv2")
+    # print("Model : DeepLabv3+, Backbone : mobilenetv2")
     return DeepV3Plus(num_classes, trunk='mobilenetv2', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D16', skip='m1', args=args)
 
@@ -773,7 +773,7 @@ def DeepMobileNetV3PlusD_OS8(args, num_classes, criterion, criterion_aux):
     """
     ShuffleNet Based Network
     """
-    print("Model : DeepLabv3+, Backbone : mobilenetv2")
+    # print("Model : DeepLabv3+, Backbone : mobilenetv2")
     return DeepV3Plus(num_classes, trunk='mobilenetv2', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D', skip='m1', args=args)
 
@@ -781,6 +781,6 @@ def DeepShuffleNetV3PlusD_OS8(args, num_classes, criterion, criterion_aux):
     """
     ShuffleNet Based Network
     """
-    print("Model : DeepLabv3+, Backbone : shufflenetv2")
+    # print("Model : DeepLabv3+, Backbone : shufflenetv2")
     return DeepV3Plus(num_classes, trunk='shufflenetv2', criterion=criterion, criterion_aux=criterion_aux,
                     variant='D', skip='m1', args=args)

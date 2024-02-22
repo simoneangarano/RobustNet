@@ -160,6 +160,13 @@ parser.add_argument('--use_wtloss', action='store_true', default=False,
 parser.add_argument('--use_isw', action='store_true', default=False,
                     help='Automatic setting from wt_layer')
 
+parser.add_argument('--kd', type=bool, default=False)
+parser.add_argument('--kd_weight', type=float, default=0.01)
+parser.add_argument('--kd_temp', type=float, default=2.0)
+parser.add_argument('--weights_dir', type=str, default='./bin/')
+parser.add_argument('--return_list', action='store_true', default=False)
+parser.add_argument('--reproduce', action='store_true', default=False)
+
 args = parser.parse_args()
 
 # Enable CUDNN Benchmarking optimization
@@ -204,7 +211,7 @@ def main():
     prep_experiment(args, parser)
     writer = None
 
-    _, _, _, extra_val_loaders, _ = datasets.setup_loaders(args)
+    _, val_loaders, _, extra_val_loaders, _ = datasets.setup_loaders(args)
 
     criterion, criterion_val = loss.get_loss(args)
     criterion_aux = loss.get_loss_aux(args)
@@ -226,10 +233,90 @@ def main():
     # Main Loop
     # for epoch in range(args.start_epoch, args.max_epoch):
 
-    for dataset, val_loader in extra_val_loaders.items():
+    for dataset, val_loader in val_loaders.items():
         print("Extra validating... This won't save pth file")
         validate(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i, save_pth=False)
 
+
+# def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, writer, curr_iter, save_pth=True):
+#     """
+#     Runs the validation loop after each training epoch
+#     val_loader: Data loader for validation
+#     dataset: dataset name (str)
+#     net: thet network
+#     criterion: loss fn
+#     optimizer: optimizer
+#     curr_epoch: current epoch
+#     writer: tensorboard writer
+#     return: val_avg for step function if required
+#     """
+
+#     net.eval()
+#     val_loss = AverageMeter()
+#     iou_acc = 0
+#     error_acc = 0
+#     dump_images = []
+
+#     for val_idx, data in enumerate(val_loader):
+#         # input        = torch.Size([1, 3, 713, 713])
+#         # gt_image           = torch.Size([1, 713, 713])
+#         inputs, gt_image, img_names, _ = data
+
+#         if len(inputs.shape) == 5:
+#             B, D, C, H, W = inputs.shape
+#             inputs = inputs.view(-1, C, H, W)
+#             gt_image = gt_image.view(-1, 1, H, W)
+
+#         assert len(inputs.size()) == 4 and len(gt_image.size()) == 3
+#         assert inputs.size()[2:] == gt_image.size()[1:]
+
+#         batch_pixel_size = inputs.size(0) * inputs.size(2) * inputs.size(3)
+#         inputs, gt_cuda = inputs.cuda(), gt_image.cuda()
+
+#         with torch.no_grad():
+#             if args.use_wtloss:
+#                 output, f_cor_arr = net(inputs, visualize=True)
+#             else:
+#                 output = net(inputs)
+
+#         del inputs
+
+#         assert output.size()[2:] == gt_image.size()[1:]
+#         assert output.size()[1] == datasets.num_classes
+
+#         val_loss.update(criterion(output, gt_cuda).item(), batch_pixel_size)
+
+#         del gt_cuda
+
+#         # Collect data from different GPU to a single GPU since
+#         # encoding.parallel.criterionparallel function calculates distributed loss
+#         # functions
+#         predictions = output.data.max(1)[1].cpu()
+
+#         # Logging
+#         if val_idx % 100 == 0:
+#             if args.local_rank == 0:
+#                 print(f"validating: {val_idx + 1} / {len(val_loader)}")
+#         # if val_idx > 10 and args.test_mode:
+#         #     break
+
+#         # Image Dumps
+#         if val_idx < 10:
+#             dump_images.append([gt_image, predictions, img_names])
+
+#         iou_acc += fast_hist(predictions.numpy().flatten(), gt_image.numpy().flatten(),
+#                              datasets.num_classes)
+#         del output, val_idx, data
+
+#     iou_acc_tensor = torch.cuda.FloatTensor(iou_acc)
+#     torch.distributed.all_reduce(iou_acc_tensor, op=torch.distributed.ReduceOp.SUM)
+#     iou_acc = iou_acc_tensor.cpu().numpy()
+
+#     if args.local_rank == 0:
+#         evaluate_eval(args, net, optim, scheduler, val_loss, iou_acc, dump_images,
+#                     writer, curr_epoch, dataset, None, curr_iter, save_pth=save_pth)
+
+#     return val_loss.avg
 
 
 def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, writer, curr_iter, save_pth=True):
@@ -248,12 +335,11 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
     net.eval()
     val_loss = AverageMeter()
     iou_acc = 0
-    error_acc = 0
     dump_images = []
 
     for val_idx, data in enumerate(val_loader):
         # input        = torch.Size([1, 3, 713, 713])
-        # gt_image           = torch.Size([1, 713, 713])
+        # gt_image     = torch.Size([1, 713, 713])
         inputs, gt_image, img_names, _ = data
 
         if len(inputs.shape) == 5:
@@ -272,14 +358,12 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
                 output, f_cor_arr = net(inputs, visualize=True)
             else:
                 output = net(inputs)
-
         del inputs
 
         assert output.size()[2:] == gt_image.size()[1:]
         assert output.size()[1] == datasets.num_classes
 
         val_loss.update(criterion(output, gt_cuda).item(), batch_pixel_size)
-
         del gt_cuda
 
         # Collect data from different GPU to a single GPU since
@@ -288,9 +372,9 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
         predictions = output.data.max(1)[1].cpu()
 
         # Logging
-        if val_idx % 100 == 0:
-            if args.local_rank == 0:
-                print("validating: %d / %d", val_idx + 1, len(val_loader))
+        # if val_idx % 1000 == 0:
+        #     if args.local_rank == 0:
+        #         print(f"validating: {val_idx + 1}/{len(val_loader)}")
         # if val_idx > 10 and args.test_mode:
         #     break
 
@@ -308,10 +392,12 @@ def validate(val_loader, dataset, net, criterion, optim, scheduler, curr_epoch, 
 
     if args.local_rank == 0:
         evaluate_eval(args, net, optim, scheduler, val_loss, iou_acc, dump_images,
-                    writer, curr_epoch, dataset, None, curr_iter, save_pth=save_pth)
+                      writer, curr_epoch, dataset, None, curr_iter, save_pth=save_pth)
+
+        if args.use_wtloss:
+            visualize_matrix(writer, f_cor_arr, curr_iter, '/Covariance/Feature-')
 
     return val_loss.avg
-
 
 if __name__ == '__main__':
     main()

@@ -26,7 +26,7 @@ parser.add_argument('--arch', type=str, default='network.deepv3.DeepWV3Plus',
                     help='Network architecture. We have DeepSRNX50V3PlusD (backbone: ResNeXt50) \
                     and deepWV3Plus (backbone: WideResNet38).')
 parser.add_argument('--dataset', nargs='*', type=str, default=['cityscapes'],
-                    help='a list of datasets; cityscapes, mapillary, camvid, kitti, gtav, mapillary, synthia')
+                    help='a list of datasets; cityscapes, bdd100k, gtav, mapillary, synthia')
 parser.add_argument('--image_uniform_sampling', action='store_true', default=False,
                     help='uniformly sample images across the multiple source domains')
 parser.add_argument('--val_dataset', nargs='*', type=str, default=['bdd100k'],
@@ -158,10 +158,13 @@ parser.add_argument('--use_wtloss', action='store_true', default=False,
 parser.add_argument('--use_isw', action='store_true', default=False,
                     help='Automatic setting from wt_layer')
 
-parser.add_argument('--kd', action='store_true', default=False)
+parser.add_argument('--kd', type=bool, default=False)
+parser.add_argument('--kd_weight', type=float, default=0.01)
+parser.add_argument('--kd_temp', type=float, default=2.0)
 parser.add_argument('--weights_dir', type=str, default='./bin/')
 parser.add_argument('--return_list', action='store_true', default=False)
 parser.add_argument('--reproduce', action='store_true', default=False)
+parser.add_argument('--eval', action='store_true', default=False)
 
 args = parser.parse_args()
 
@@ -230,10 +233,12 @@ def main():
         teachers = []
         for args.val_dataset in args.val_dataset:
             teacher = network.get_net(args, criterion, criterion_aux)
-            teacher = torch.nn.SyncBatchNorm.convert_sync_batchnorm(net)
+            teacher = torch.nn.SyncBatchNorm.convert_sync_batchnorm(teacher)
             teacher.load_state_dict(torch.load(os.path.join(args.weights_dir, args.val_dataset + '.pth'))['state_dict'])
             teachers.append(teacher)
         teacher = network.make_ensemble_net(teachers)   
+        # for dataset, val_loader in val_loaders.items():
+        #     validate(val_loader, dataset, teacher, criterion_val, optim, scheduler, 0, writer, 0)
 
     epoch = 0
     i = 0
@@ -252,38 +257,39 @@ def main():
     # Main Loop
     # for epoch in range(args.start_epoch, args.max_epoch):
 
-    while i < args.max_iter:
-        # Update EPOCH CTR
-        cfg.immutable(False)
-        cfg.ITER = i
-        cfg.immutable(True)
+    if not args.eval:
+        while i < args.max_iter:
+            # Update EPOCH CTR
+            cfg.immutable(False)
+            cfg.ITER = i
+            cfg.immutable(True)
 
-        i = train(train_loader, net, optim, epoch, writer, scheduler, args.max_iter, teacher)
-        train_loader.sampler.set_epoch(epoch + 1)
+            i = train(train_loader, net, optim, epoch, writer, scheduler, args.max_iter, teacher)
+            train_loader.sampler.set_epoch(epoch + 1)
 
-        if (args.dynamic and args.use_isw and epoch % (args.cov_stat_epoch + 1) == args.cov_stat_epoch) \
-           or (args.dynamic is False and args.use_isw and epoch == args.cov_stat_epoch):
-            net.module.reset_mask_matrix()
-            for trial in range(args.trials):
-                for dataset, val_loader in covstat_val_loaders.items():  # For get the statistics of covariance
-                    validate_for_cov_stat(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i,
-                                          save_pth=False)
-                    net.module.set_mask_matrix()
+            if (args.dynamic and args.use_isw and epoch % (args.cov_stat_epoch + 1) == args.cov_stat_epoch) \
+            or (args.dynamic is False and args.use_isw and epoch == args.cov_stat_epoch):
+                net.module.reset_mask_matrix()
+                for trial in range(args.trials):
+                    for dataset, val_loader in covstat_val_loaders.items():  # For get the statistics of covariance
+                        validate_for_cov_stat(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i,
+                                            save_pth=False)
+                        net.module.set_mask_matrix()
 
-        if args.local_rank == 0:
-            print("\nEvaluating...")
-            for dataset, val_loader in val_loaders.items():
-                validate(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i)
-            # evaluate_eval(args, net, optim, scheduler, None, None, [], writer, epoch, "None", None, i, save_pth=True)
+            if args.local_rank == 0:
+                print("\nEvaluating...")
+                for dataset, val_loader in val_loaders.items():
+                    validate(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i)
+                # evaluate_eval(args, net, optim, scheduler, None, None, [], writer, epoch, "None", None, i, save_pth=True)
 
-        if args.class_uniform_pct:
-            if epoch >= args.max_cu_epoch:
-                train_obj.build_epoch(cut=True)
-                train_loader.sampler.set_num_samples()
-            else:
-                train_obj.build_epoch()
+            if args.class_uniform_pct:
+                if epoch >= args.max_cu_epoch:
+                    train_obj.build_epoch(cut=True)
+                    train_loader.sampler.set_num_samples()
+                else:
+                    train_obj.build_epoch()
 
-        epoch += 1
+            epoch += 1
 
     # Validation after epochs
     if len(val_loaders) == 1:
@@ -291,10 +297,11 @@ def main():
         for dataset, val_loader in val_loaders.items():
             validate(val_loader, dataset, net, criterion_val, optim, scheduler, epoch, writer, i)
     else:
-        if args.local_rank == 0:
-            print("Final Evaluation...")
-            evaluate_eval(args, net, optim, scheduler, None, None, [],
-                        writer, epoch, "None", None, i, save_pth=True)
+        pass
+        # if args.local_rank == 0:
+        #     print("Final Evaluation...")
+        #     evaluate_eval(args, net, optim, scheduler, None, None, [],
+        #                   writer, epoch, "None", None, i, save_pth=True)
 
     for dataset, val_loader in extra_val_loaders.items():
         print("Extra validating... This won't save pth file")
@@ -362,7 +369,7 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter, tea
 
             if args.use_isw:
                 outputs = net(input, gts=gt, aux_gts=aux_gt, img_gt=img_gt, visualize=args.visualize_feature,
-                            apply_wtloss=False if curr_epoch<=args.cov_stat_epoch else True)
+                              apply_wtloss=False if curr_epoch<=args.cov_stat_epoch else True)
             else:
                 outputs = net(input, gts=gt, aux_gts=aux_gt, img_gt=img_gt, visualize=args.visualize_feature, t_out=t_output)
             outputs_index = 0
@@ -375,10 +382,10 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter, tea
             if args.use_wtloss and (not args.use_isw or (args.use_isw and curr_epoch > args.cov_stat_epoch)):
                 wt_loss = outputs[outputs_index]
                 outputs_index += 1
-                total_loss = total_loss + (args.wt_reg_weight * wt_loss)
+                total_loss += (args.wt_reg_weight * wt_loss)
             if args.kd:
                 kd_loss = outputs[outputs_index]
-                total_loss = total_loss + (args.kd_weight * kd_loss)
+                total_loss += (args.kd_weight * kd_loss)
                 outputs_index += 1
             else:
                 wt_loss, kd_loss = 0, 0
@@ -422,7 +429,7 @@ def train(train_loader, net, optim, curr_epoch, writer, scheduler, max_iter, tea
         curr_iter += 1
         scheduler.step()
 
-        # if i > 5 and args.test_mode:
+        # if i > 5:
         #     return curr_iter
 
     return curr_iter

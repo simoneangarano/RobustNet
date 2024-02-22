@@ -216,6 +216,7 @@ class Mapillary(data.Dataset):
 
         # find all images
         self.imgs = make_dataset(quality, mode)
+        self.aug_imgs = []
         if len(self.imgs) == 0:
             raise RuntimeError('Found 0 images, please check the data set')
         

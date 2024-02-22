@@ -365,8 +365,8 @@ class GTAVUniform(data.Dataset):
         if os.path.isfile(json_fn):
             with open(json_fn, 'r') as json_data:
                 centroids = json.load(json_data)
-            for idx in centroids:
-                print("###### centroids", idx)
+            # for idx in centroids:
+            #     print("###### centroids", idx)
 
             self.centroids = {int(idx): centroids[idx] for idx in centroids}
         else:

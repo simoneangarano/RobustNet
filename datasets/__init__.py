@@ -562,8 +562,8 @@ def setup_loaders(args):
                               num_workers=args.num_workers, shuffle=(train_sampler is None), drop_last=True, sampler = train_sampler)
 
     extra_val_loader = {}
-    # for val_dataset in args.val_dataset:
-    #     extra_val_loader[val_dataset] = create_extra_val_loader(args, val_dataset, val_input_transform, target_transform, val_sampler)
+    for val_dataset in args.val_dataset:
+        extra_val_loader[val_dataset] = create_extra_val_loader(args, val_dataset, val_input_transform, target_transform, val_sampler)
 
     covstat_val_loader = {}
     # for val_dataset in args.covstat_val_dataset:
