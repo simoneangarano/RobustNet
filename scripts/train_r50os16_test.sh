@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
     python train.py \
-        --dataset bdd100k cityscapes mapillary synthia --val_dataset gtav \
+        --dataset bdd100k gtav mapillary synthia --val_dataset cityscapes \
         --arch network.deepv3.DeepR50V3PlusD \
         --city_mode train \
         --sgd \
@@ -19,14 +19,13 @@
         --gblur \
         --color_aug 0.5 \
         --date 0214 \
-        --exp erm \
+        --exp erm_cityscapes \
         --ckpt ./logs/ \
         --tb_path ./logs/ \
         --wt_reg_weight 0.0 \
         --relax_denom 0.0 \
         --cov_stat_epoch 0 \
         --wt_layer 0 0 0 0 0 0 0 \
+        --kd 0 2>&1 | tee logs/erm_cityscapes.txt 
         # --snapshot bin/kd_gtav.pth \
         # --eval \
-        # --kd 1 \
-        2>&1 | tee logs/erm.txt 
